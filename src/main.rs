@@ -1,4 +1,14 @@
+use zenoh::prelude::sync::*;
+use zenoh::config::Config;
+use zenoh::buffers::reader::HasReader;
+use serde_derive::{Serialize, Deserialize};
+use cdr::{CdrLe, Infinite};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+
+#[derive(Serialize, Deserialize, PartialEq)]
+struct GateMode {
+    data: u8,  // 0: AUTO, 1: EXTERNAL
+}
 
 fn print_help() {
     println!("------------------------------------");
@@ -21,6 +31,20 @@ fn print_help() {
 
 fn main() {
     print_help();
+    let session = zenoh::open(Config::default()).res().unwrap();
+    let gate_mode_key = String::from("rt/control/current_gate_mode");
+    let _gate_mode_sub = session
+        .declare_subscriber(gate_mode_key)
+        .callback_mut(move |sample| {
+            match cdr::deserialize_from::<_, GateMode, _>(sample.payload.reader(), cdr::size::Infinite) {
+                Ok(gatemode) => {
+                    println!("gatemode.date={}\r", gatemode.data);
+                }
+                Err(_) => {}
+            }
+        })
+        .res()
+        .unwrap();
     crossterm::terminal::enable_raw_mode().unwrap();
     loop {
         match crossterm::event::read() {
