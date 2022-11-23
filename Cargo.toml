@@ -2,8 +2,9 @@
 name = "autoware_manual_control"
 version = "0.1.0"
 edition = "2021"
-author = "ChenYing Kuo"
+authors = ["ChenYing Kuo <evshary@gmail.com>"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+crossterm = "0.25.0"
