@@ -1,9 +1,40 @@
 use zenoh::prelude::sync::*;
+use zenoh::subscriber::Subscriber;
 use zenoh::config::Config;
 use zenoh::buffers::reader::HasReader;
 use serde_derive::{Serialize, Deserialize};
 use cdr::{CdrLe, Infinite};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+
+struct ManualController<'a> {
+    session: Session,
+    gate_mode_sub: Option<Subscriber<'a, ()>>,
+}
+
+impl<'a> ManualController<'a> {
+    pub fn new() -> Self {
+        ManualController {
+            session: zenoh::open(Config::default()).res().unwrap(),
+            gate_mode_sub: None
+        }
+    }
+
+    pub fn init<'b: 'a>(&'b mut self) {
+        let gate_mode_key = String::from("rt/control/current_gate_mode");
+        self.gate_mode_sub = Some(self.session
+            .declare_subscriber(gate_mode_key)
+            .callback_mut(move |sample| {
+                match cdr::deserialize_from::<_, GateMode, _>(sample.payload.reader(), cdr::size::Infinite) {
+                    Ok(gatemode) => {
+                        println!("gatemode.date={}\r", gatemode.data);
+                    }
+                    Err(_) => {}
+                }
+            })
+            .res()
+            .unwrap());
+    }
+}
 
 #[derive(Serialize, Deserialize, PartialEq)]
 struct GateMode {
@@ -30,21 +61,9 @@ fn print_help() {
 }
 
 fn main() {
+    let mut manual_controller = ManualController::new();
+    manual_controller.init();
     print_help();
-    let session = zenoh::open(Config::default()).res().unwrap();
-    let gate_mode_key = String::from("rt/control/current_gate_mode");
-    let _gate_mode_sub = session
-        .declare_subscriber(gate_mode_key)
-        .callback_mut(move |sample| {
-            match cdr::deserialize_from::<_, GateMode, _>(sample.payload.reader(), cdr::size::Infinite) {
-                Ok(gatemode) => {
-                    println!("gatemode.date={}\r", gatemode.data);
-                }
-                Err(_) => {}
-            }
-        })
-        .res()
-        .unwrap();
     crossterm::terminal::enable_raw_mode().unwrap();
     loop {
         match crossterm::event::read() {
