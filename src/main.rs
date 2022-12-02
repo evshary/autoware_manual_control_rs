@@ -1,18 +1,24 @@
 use zenoh::prelude::sync::*;
 use zenoh::subscriber::Subscriber;
-use zenoh::config::Config;
+use zenoh::publication::Publisher;
 use zenoh::buffers::reader::HasReader;
 use serde_derive::{Serialize, Deserialize};
 use cdr::{CdrLe, Infinite};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 struct ManualController<'a> {
-    _gate_mode_sub: Subscriber<'a, ()>,
+    pub_gate_mode: Publisher<'a>,
+    _sub_gate_mode: Subscriber<'a, ()>,
 }
 
 impl<'a> ManualController<'a> {
     pub fn new(z_session: &'a Session) -> Self {
-        let gate_mode_sub = z_session
+        let pub_gate_mode = z_session
+            .declare_publisher("rt/control/gate_mode_cmd")
+            .res()
+            .unwrap();
+
+        let sub_gate_mode = z_session
             .declare_subscriber("rt/control/current_gate_mode")
             .callback_mut(move |sample| {
                 match cdr::deserialize_from::<_, GateMode, _>(sample.payload.reader(), cdr::size::Infinite) {
@@ -25,8 +31,15 @@ impl<'a> ManualController<'a> {
             .res()
             .unwrap();
         ManualController {
-            _gate_mode_sub: gate_mode_sub
+            pub_gate_mode,
+            _sub_gate_mode: sub_gate_mode
         }
+    }
+
+    pub fn pub_gate_mode(&self, mode: u8) {
+        let gate_mode_data = GateMode { data: mode};
+        let encoded = cdr::serialize::<_, _, CdrLe>(&gate_mode_data, Infinite).unwrap();
+        self.pub_gate_mode.put(encoded).res().unwrap();
     }
 }
 
@@ -56,7 +69,7 @@ fn print_help() {
 
 fn main() {
     let z_session = zenoh::open(config::peer()).res().unwrap();
-    let _manual_controller = ManualController::new(&z_session);
+    let manual_controller = ManualController::new(&z_session);
     print_help();
     crossterm::terminal::enable_raw_mode().unwrap();
     loop {
@@ -69,6 +82,7 @@ fn main() {
             },
             Ok(Event::Key(KeyEvent {code: KeyCode::Char('x'), modifiers: _, kind: _, state: _})) => {
                 // Do something
+                manual_controller.pub_gate_mode(1);
             },
             Ok(Event::Key(KeyEvent {code: KeyCode::Char('c'), modifiers: _, kind: _, state: _})) => {
                 // Do something
