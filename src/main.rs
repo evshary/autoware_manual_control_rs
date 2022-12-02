@@ -7,22 +7,13 @@ use cdr::{CdrLe, Infinite};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 struct ManualController<'a> {
-    session: Session,
-    gate_mode_sub: Option<Subscriber<'a, ()>>,
+    _gate_mode_sub: Subscriber<'a, ()>,
 }
 
 impl<'a> ManualController<'a> {
-    pub fn new() -> Self {
-        ManualController {
-            session: zenoh::open(Config::default()).res().unwrap(),
-            gate_mode_sub: None
-        }
-    }
-
-    pub fn init<'b: 'a>(&'b mut self) {
-        let gate_mode_key = String::from("rt/control/current_gate_mode");
-        self.gate_mode_sub = Some(self.session
-            .declare_subscriber(gate_mode_key)
+    pub fn new(z_session: &'a Session) -> Self {
+        let gate_mode_sub = z_session
+            .declare_subscriber("rt/control/current_gate_mode")
             .callback_mut(move |sample| {
                 match cdr::deserialize_from::<_, GateMode, _>(sample.payload.reader(), cdr::size::Infinite) {
                     Ok(gatemode) => {
@@ -32,7 +23,10 @@ impl<'a> ManualController<'a> {
                 }
             })
             .res()
-            .unwrap());
+            .unwrap();
+        ManualController {
+            _gate_mode_sub: gate_mode_sub
+        }
     }
 }
 
@@ -61,8 +55,8 @@ fn print_help() {
 }
 
 fn main() {
-    let mut manual_controller = ManualController::new();
-    manual_controller.init();
+    let z_session = zenoh::open(config::peer()).res().unwrap();
+    let _manual_controller = ManualController::new(&z_session);
     print_help();
     crossterm::terminal::enable_raw_mode().unwrap();
     loop {
