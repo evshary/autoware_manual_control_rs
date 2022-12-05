@@ -8,9 +8,9 @@ fn print_help() {
     println!("------------------------------------");
     println!("| Different Mode:                  |");
     println!("|   z: Toggle auto & external mode |");
-    println!("|   x: GateMode => Drive           |");
-    println!("|   c: GateMode => Reverse         |");
-    println!("|   v: GateMode => Park            |");
+    println!("|   x: Gear Type => Drive          |");
+    println!("|   c: Gear Type => Reverse        |");
+    println!("|   v: Gear Type => Park           |");
     println!("|   s: View current mode           |");
     println!("| Speed:                           |");
     println!("|   u: Increase speed              |");
