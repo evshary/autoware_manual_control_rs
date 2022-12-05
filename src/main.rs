@@ -25,7 +25,8 @@ fn print_help() {
 
 fn main() {
     let z_session = zenoh::open(config::peer()).res().unwrap();
-    let manual_controller = ManualController::new(&z_session);
+    let mut manual_controller = ManualController::new(&z_session);
+    manual_controller.init(&z_session);
     print_help();
     crossterm::terminal::enable_raw_mode().unwrap();
     loop {

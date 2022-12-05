@@ -4,10 +4,14 @@ use zenoh::publication::Publisher;
 use zenoh::buffers::reader::HasReader;
 use serde_derive::{Serialize, Deserialize};
 use cdr::{CdrLe, Infinite};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU8, Ordering};
 
 pub struct ManualController<'a> {
     pub_gate_mode: Publisher<'a>,
-    _sub_gate_mode: Subscriber<'a, ()>,
+    _sub_gate_mode: Option<Subscriber<'a, ()>>,
+    
+    gate_mode: Arc<AtomicU8>,
 }
 
 impl<'a> ManualController<'a> {
@@ -17,23 +21,28 @@ impl<'a> ManualController<'a> {
             .res()
             .unwrap();
 
-        let sub_gate_mode = z_session
+        ManualController {
+            pub_gate_mode,
+            _sub_gate_mode: None,
+            gate_mode: Arc::new(AtomicU8::new(0)),
+        }
+    }
+
+    pub fn init(&mut self, z_session: &'a Session) {
+        let gate_mode = self.gate_mode.clone();
+        self._sub_gate_mode = Some(z_session
             .declare_subscriber("rt/control/current_gate_mode")
             .callback_mut(move |sample| {
                 match cdr::deserialize_from::<_, GateMode, _>(sample.payload.reader(), cdr::size::Infinite) {
                     Ok(gatemode) => {
-                        println!("gatemode.date={}\r", gatemode.data);
+                        //println!("gatemode.date={}\r", gatemode.data);
+                        gate_mode.store(gatemode.data, Ordering::Relaxed);
                     }
                     Err(_) => {}
                 }
             })
             .res()
-            .unwrap();
-
-        ManualController {
-            pub_gate_mode,
-            _sub_gate_mode: sub_gate_mode
-        }
+            .unwrap());
     }
 
     pub fn pub_gate_mode(&self, mode: u8) {
