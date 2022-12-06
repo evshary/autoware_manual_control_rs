@@ -10,6 +10,7 @@ use std::sync::atomic::{AtomicU8, Ordering};
 pub struct ManualController<'a> {
     pub_gate_mode: Publisher<'a>,
     _sub_gate_mode: Option<Subscriber<'a, ()>>,
+    _sub_engage: Option<Subscriber<'a, ()>>,
     
     gate_mode: Arc<AtomicU8>,
 }
@@ -24,6 +25,7 @@ impl<'a> ManualController<'a> {
         ManualController {
             pub_gate_mode,
             _sub_gate_mode: None,
+            _sub_engage: None,
             gate_mode: Arc::new(AtomicU8::new(0)),
         }
     }
@@ -43,10 +45,24 @@ impl<'a> ManualController<'a> {
             })
             .res()
             .unwrap());
+        self._sub_engage = Some(z_session
+            .declare_subscriber("rt/api/autoware/get/engage")
+            .callback_mut(move |sample| {
+                match cdr::deserialize_from::<_, GetEngage, _>(sample.payload.reader(), cdr::size::Infinite) {
+                    Ok(engage) => {
+                        println!("Engage: {}\r", engage.enable);
+                    }
+                    Err(_) => {
+                        println!("Failed to pass\r");
+                    }
+                }
+            })
+            .res()
+            .unwrap());
     }
 
     pub fn pub_gate_mode(&self, mode: u8) {
-        let gate_mode_data = GateMode { data: mode};
+        let gate_mode_data = GateMode { data: mode };
         let encoded = cdr::serialize::<_, _, CdrLe>(&gate_mode_data, Infinite).unwrap();
         self.pub_gate_mode.put(encoded).res().unwrap();
     }
@@ -55,4 +71,16 @@ impl<'a> ManualController<'a> {
 #[derive(Serialize, Deserialize, PartialEq)]
 struct GateMode {
     data: u8,  // 0: AUTO, 1: EXTERNAL
+}
+
+#[derive(Serialize, Deserialize, PartialEq)]
+struct TimeStamp {
+    sec: i32,
+    nsec: u32,
+}
+
+#[derive(Serialize, Deserialize, PartialEq)]
+struct GetEngage {
+    ts: TimeStamp,
+    enable: bool,
 }
