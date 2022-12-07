@@ -72,6 +72,7 @@ impl<'a> ManualController<'a> {
     }
 
     fn send_client_engage(&self) {
+        // TODO: We assign GUID and seq to 0, but this should be filled with meaningful value.
         let engage_data = Engage { header: ServiceHeader { guid: 0, seq: 0 }, enable: true };
         let encoded = cdr::serialize::<_, _, CdrLe>(&engage_data, Infinite).unwrap();
         self.client_engage_req.put(encoded).res().unwrap();
@@ -88,11 +89,6 @@ impl<'a> ManualController<'a> {
 }
 
 #[derive(Serialize, Deserialize, PartialEq)]
-struct GateMode {
-    data: u8,  // 0: AUTO, 1: EXTERNAL
-}
-
-#[derive(Serialize, Deserialize, PartialEq)]
 struct TimeStamp {
     sec: i32,
     nsec: u32,
@@ -105,12 +101,23 @@ struct ServiceHeader {
 }
 
 #[derive(Serialize, Deserialize, PartialEq)]
+struct GateMode {
+    data: u8,  // 0: AUTO, 1: EXTERNAL
+}
+
+#[derive(Serialize, Deserialize, PartialEq)]
+struct GetEngage {
+    ts: TimeStamp,
+    enable: bool,
+}
+
+#[derive(Serialize, Deserialize, PartialEq)]
 struct Engage {
     header: ServiceHeader,
     enable: bool,
 }
 
-/*
+/* We don't need to get service response currently
 #[derive(Serialize, Deserialize, PartialEq)]
 struct ResponseStatus {
     header: ServiceHeader,
@@ -118,9 +125,3 @@ struct ResponseStatus {
     message: String,
 }
 */
-
-#[derive(Serialize, Deserialize, PartialEq)]
-struct GetEngage {
-    ts: TimeStamp,
-    enable: bool,
-}
