@@ -38,13 +38,13 @@ fn main() {
                 manual_controller.toggle_gate_mode();
             },
             Ok(Event::Key(KeyEvent {code: KeyCode::Char('x'), modifiers: _, kind: _, state: _})) => {
-                // Do something
+                manual_controller.pub_gear_command(2);
             },
             Ok(Event::Key(KeyEvent {code: KeyCode::Char('c'), modifiers: _, kind: _, state: _})) => {
-                // Do something
+                manual_controller.pub_gear_command(20);
             },
             Ok(Event::Key(KeyEvent {code: KeyCode::Char('v'), modifiers: _, kind: _, state: _})) => {
-                // Do something
+                manual_controller.pub_gear_command(22);
             },
             Ok(Event::Key(KeyEvent {code: KeyCode::Char('s'), modifiers: _, kind: _, state: _})) => {
                 // Do something

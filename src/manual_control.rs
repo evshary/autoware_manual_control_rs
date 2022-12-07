@@ -8,17 +8,18 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU8, Ordering};
 
 pub struct ManualController<'a> {
-    pub_gate_mode: Publisher<'a>,
+    publisher_gate_mode: Publisher<'a>,
     client_engage_req: Publisher<'a>,
-    _sub_gate_mode: Option<Subscriber<'a, ()>>,
-    _sub_engage: Option<Subscriber<'a, ()>>,
+    publisher_gear_command: Publisher<'a>,
+    _subscriber_gate_mode: Option<Subscriber<'a, ()>>,
+    _subscriber_engage: Option<Subscriber<'a, ()>>,
     
     gate_mode: Arc<AtomicU8>,
 }
 
 impl<'a> ManualController<'a> {
     pub fn new(z_session: &'a Session) -> Self {
-        let pub_gate_mode = z_session
+        let publisher_gate_mode = z_session
             .declare_publisher("rt/control/gate_mode_cmd")
             .res()
             .unwrap();
@@ -26,19 +27,24 @@ impl<'a> ManualController<'a> {
             .declare_publisher("rq/api/autoware/set/engageRequest")
             .res()
             .unwrap();
+        let publisher_gear_command = z_session
+            .declare_publisher("rt/external/selected/gear_cmd")
+            .res()
+            .unwrap();
 
         ManualController {
-            pub_gate_mode,
+            publisher_gate_mode,
             client_engage_req,
-            _sub_gate_mode: None,
-            _sub_engage: None,
+            publisher_gear_command,
+            _subscriber_gate_mode: None,
+            _subscriber_engage: None,
             gate_mode: Arc::new(AtomicU8::new(0)),
         }
     }
 
     pub fn init(&mut self, z_session: &'a Session) {
         let gate_mode = self.gate_mode.clone();
-        self._sub_gate_mode = Some(z_session
+        self._subscriber_gate_mode = Some(z_session
             .declare_subscriber("rt/control/current_gate_mode")
             .callback_mut(move |sample| {
                 match cdr::deserialize_from::<_, GateMode, _>(sample.payload.reader(), cdr::size::Infinite) {
@@ -51,7 +57,7 @@ impl<'a> ManualController<'a> {
             })
             .res()
             .unwrap());
-        self._sub_engage = Some(z_session
+        self._subscriber_engage = Some(z_session
             .declare_subscriber("rt/api/autoware/get/engage")
             .callback_mut(move |sample| {
                 match cdr::deserialize_from::<_, GetEngage, _>(sample.payload.reader(), cdr::size::Infinite) {
@@ -68,7 +74,7 @@ impl<'a> ManualController<'a> {
     fn pub_gate_mode(&self, mode: u8) {
         let gate_mode_data = GateMode { data: mode };
         let encoded = cdr::serialize::<_, _, CdrLe>(&gate_mode_data, Infinite).unwrap();
-        self.pub_gate_mode.put(encoded).res().unwrap();
+        self.publisher_gate_mode.put(encoded).res().unwrap();
     }
 
     fn send_client_engage(&self) {
@@ -85,6 +91,12 @@ impl<'a> ManualController<'a> {
         } else { // External
             self.pub_gate_mode(0);
         }
+    }
+
+    pub fn pub_gear_command(&self, command: u8) {
+        let gear_command = GearCommand { ts: TimeStamp { sec: 0, nsec: 0 }, command: command };
+        let encoded = cdr::serialize::<_, _, CdrLe>(&gear_command, Infinite).unwrap();
+        self.publisher_gear_command.put(encoded).res().unwrap();
     }
 }
 
@@ -125,3 +137,13 @@ struct ResponseStatus {
     message: String,
 }
 */
+
+#[derive(Serialize, Deserialize, PartialEq)]
+struct GearCommand {
+    ts: TimeStamp,
+    command: u8,
+    // DRIVE = 2;
+    // REVERSE = 20;
+    // PARK = 22;
+    // LOW = 23;
+}
