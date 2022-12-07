@@ -47,7 +47,7 @@ fn main() {
                 manual_controller.pub_gear_command(22);
             },
             Ok(Event::Key(KeyEvent {code: KeyCode::Char('s'), modifiers: _, kind: _, state: _})) => {
-                // Do something
+                println!("{}\r", manual_controller.get_status());
             },
             Ok(Event::Key(KeyEvent {code: KeyCode::Char('u'), modifiers: _, kind: _, state: _})) => {
                 // Do something

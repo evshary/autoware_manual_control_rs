@@ -5,16 +5,20 @@ use zenoh::buffers::reader::HasReader;
 use serde_derive::{Serialize, Deserialize};
 use cdr::{CdrLe, Infinite};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
 pub struct ManualController<'a> {
     publisher_gate_mode: Publisher<'a>,
     client_engage_req: Publisher<'a>,
     publisher_gear_command: Publisher<'a>,
+
     _subscriber_gate_mode: Option<Subscriber<'a, ()>>,
     _subscriber_engage: Option<Subscriber<'a, ()>>,
+    _subscriber_gear_command: Option<Subscriber<'a, ()>>,
     
     gate_mode: Arc<AtomicU8>,
+    current_engage: Arc<AtomicBool>,
+    gear_command: Arc<AtomicU8>,
 }
 
 impl<'a> ManualController<'a> {
@@ -36,9 +40,14 @@ impl<'a> ManualController<'a> {
             publisher_gate_mode,
             client_engage_req,
             publisher_gear_command,
+
             _subscriber_gate_mode: None,
             _subscriber_engage: None,
+            _subscriber_gear_command: None,
+            
             gate_mode: Arc::new(AtomicU8::new(0)),
+            current_engage: Arc::new(AtomicBool::new(false)),
+            gear_command: Arc::new(AtomicU8::new(0)),
         }
     }
 
@@ -51,20 +60,36 @@ impl<'a> ManualController<'a> {
                     Ok(gatemode) => {
                         //println!("gatemode.date={}\r", gatemode.data);
                         gate_mode.store(gatemode.data, Ordering::Relaxed);
-                    }
-                    Err(_) => {}
+                    },
+                    Err(_) => {},
                 }
             })
             .res()
             .unwrap());
+        let current_engage = self.current_engage.clone();
         self._subscriber_engage = Some(z_session
             .declare_subscriber("rt/api/autoware/get/engage")
             .callback_mut(move |sample| {
                 match cdr::deserialize_from::<_, GetEngage, _>(sample.payload.reader(), cdr::size::Infinite) {
-                    Ok(_engage) => {
-                        //println!("Engage: {} {}\r", engage.ts.sec, engage.enable);
-                    }
-                    Err(_) => {}
+                    Ok(engage) => {
+                        //println!("Engage: {}\r", engage.enable);
+                        current_engage.store(engage.enable, Ordering::Relaxed);
+                    },
+                    Err(_) => {},
+                }
+            })
+            .res()
+            .unwrap());
+        let gear_cmd = self.gear_command.clone();
+        self._subscriber_gear_command = Some(z_session
+            .declare_subscriber("rt/vehicle/status/gear_status")
+            .callback_mut(move |sample| {
+                match cdr::deserialize_from::<_, GearCommand, _>(sample.payload.reader(), cdr::size::Infinite) {
+                    Ok(gearcmd) => {
+                        //println!("GearCommand: {}\r", gearcmd.command);
+                        gear_cmd.store(gearcmd.command, Ordering::Relaxed);
+                    },
+                    Err(_) => {},
                 }
             })
             .res()
@@ -97,6 +122,26 @@ impl<'a> ManualController<'a> {
         let gear_command = GearCommand { ts: TimeStamp { sec: 0, nsec: 0 }, command: command };
         let encoded = cdr::serialize::<_, _, CdrLe>(&gear_command, Infinite).unwrap();
         self.publisher_gear_command.put(encoded).res().unwrap();
+    }
+
+    pub fn get_status(&self) -> String {
+        let mut s = String::from("Enage:");
+        s += if self.current_engage.load(Ordering::Relaxed) { "Ready" } else {"Not Ready"};
+        s += "\tGate Mode:";
+        s += match self.gate_mode.load(Ordering::Relaxed) {
+            0 => "Auto",
+            1 => "External",
+            _ => "Unknown",
+        };
+        s += "\tGear:";
+        s += match self.gear_command.load(Ordering::Relaxed) {
+            2 => "D",
+            20 => "R",
+            22 => "P",
+            23 => "L",
+            _ => "?",
+        };
+        s
     }
 }
 
