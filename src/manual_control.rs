@@ -6,19 +6,23 @@ use serde_derive::{Serialize, Deserialize};
 use cdr::{CdrLe, Infinite};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use atomic_float::{AtomicF32};
 
 pub struct ManualController<'a> {
+    // publisher
     publisher_gate_mode: Publisher<'a>,
     client_engage_req: Publisher<'a>,
     publisher_gear_command: Publisher<'a>,
-
+    // subscriber
     _subscriber_gate_mode: Option<Subscriber<'a, ()>>,
     _subscriber_engage: Option<Subscriber<'a, ()>>,
     _subscriber_gear_command: Option<Subscriber<'a, ()>>,
-    
+    _subscriber_velocity: Option<Subscriber<'a, ()>>,
+    // status
     gate_mode: Arc<AtomicU8>,
     current_engage: Arc<AtomicBool>,
     gear_command: Arc<AtomicU8>,
+    current_velocity: Arc<AtomicF32>,
 }
 
 impl<'a> ManualController<'a> {
@@ -37,17 +41,20 @@ impl<'a> ManualController<'a> {
             .unwrap();
 
         ManualController {
+            // publisher
             publisher_gate_mode,
             client_engage_req,
             publisher_gear_command,
-
+            // subscriber
             _subscriber_gate_mode: None,
             _subscriber_engage: None,
             _subscriber_gear_command: None,
-            
+            _subscriber_velocity: None,
+            // status
             gate_mode: Arc::new(AtomicU8::new(0)),
             current_engage: Arc::new(AtomicBool::new(false)),
             gear_command: Arc::new(AtomicU8::new(0)),
+            current_velocity: Arc::new(AtomicF32::new(0.0)),
         }
     }
 
@@ -88,6 +95,20 @@ impl<'a> ManualController<'a> {
                     Ok(gearcmd) => {
                         //println!("GearCommand: {}\r", gearcmd.command);
                         gear_cmd.store(gearcmd.command, Ordering::Relaxed);
+                    },
+                    Err(_) => {},
+                }
+            })
+            .res()
+            .unwrap());
+        let current_velocity = self.current_velocity.clone();
+        self._subscriber_velocity = Some(z_session
+            .declare_subscriber("rt/vehicle/status/velocity_status")
+            .callback_mut(move |sample| {
+                match cdr::deserialize_from::<_, CurrentVelocity, _>(sample.payload.reader(), cdr::size::Infinite) {
+                    Ok(velocity) => {
+                        //println!("Velocity: {}\r", velocity.longitudinal_velocity);
+                        current_velocity.store(velocity.longitudinal_velocity, Ordering::Relaxed);
                     },
                     Err(_) => {},
                 }
@@ -191,4 +212,18 @@ struct GearCommand {
     // REVERSE = 20;
     // PARK = 22;
     // LOW = 23;
+}
+
+#[derive(Serialize, Deserialize, PartialEq)]
+struct StdMsgsHeader {
+    ts: TimeStamp,
+    frameid: String,
+}
+
+#[derive(Serialize, Deserialize, PartialEq)]
+struct CurrentVelocity {
+    header: StdMsgsHeader,
+    longitudinal_velocity: f32,
+    lateral_velocity: f32,
+    heading_rate: f32,
 }
