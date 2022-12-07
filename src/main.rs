@@ -4,6 +4,11 @@ use zenoh::prelude::sync::*;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use manual_control::ManualController;
 
+const MAX_STEER_ANGLE  : f32 = 0.3925; // 22.5 * (PI / 180)
+const STEP_STEER_ANGLE : f32 = 0.0174; // 1 * (PI / 180)
+const MAX_SPEED        : f32 = 27.78;  // 100 km/hr = 27.78 m/s
+const STEP_SPEED       : f32 = 1.389;  // 5 km/hr = 1.389 m/s
+
 fn print_help() {
     println!("------------------------------------");
     println!("| Different Mode:                  |");
@@ -24,6 +29,9 @@ fn print_help() {
 }
 
 fn main() {
+    let mut velocity = 0.0;  // m/s
+    let mut angle = 0.0;     // radian
+
     let z_session = zenoh::open(config::peer()).res().unwrap();
     let mut manual_controller = ManualController::new(&z_session);
     manual_controller.init(&z_session);
@@ -50,22 +58,28 @@ fn main() {
                 println!("{}\r", manual_controller.get_status());
             },
             Ok(Event::Key(KeyEvent {code: KeyCode::Char('u'), modifiers: _, kind: _, state: _})) => {
-                // Do something
+                velocity = num::clamp(velocity + STEP_SPEED, 0.0, MAX_SPEED);
+                manual_controller.update_control_command(velocity, angle);
             },
             Ok(Event::Key(KeyEvent {code: KeyCode::Char('i'), modifiers: _, kind: _, state: _})) => {
-                // Do something
+                velocity = 0.0;
+                manual_controller.update_control_command(velocity, angle);
             },
             Ok(Event::Key(KeyEvent {code: KeyCode::Char('o'), modifiers: _, kind: _, state: _})) => {
-                // Do something
+                velocity = num::clamp(velocity - STEP_SPEED, 0.0, MAX_SPEED);
+                manual_controller.update_control_command(velocity, angle);
             },
             Ok(Event::Key(KeyEvent {code: KeyCode::Char('j'), modifiers: _, kind: _, state: _})) => {
-                // Do something
+                angle = num::clamp(angle + STEP_STEER_ANGLE, -MAX_STEER_ANGLE, MAX_STEER_ANGLE);
+                manual_controller.update_control_command(velocity, angle);
             },
             Ok(Event::Key(KeyEvent {code: KeyCode::Char('k'), modifiers: _, kind: _, state: _})) => {
-                // Do something
+                angle = 0.0;
+                manual_controller.update_control_command(velocity, angle);
             },
             Ok(Event::Key(KeyEvent {code: KeyCode::Char('l'), modifiers: _, kind: _, state: _})) => {
-                // Do something
+                angle = num::clamp(angle - STEP_STEER_ANGLE, -MAX_STEER_ANGLE, MAX_STEER_ANGLE);
+                manual_controller.update_control_command(velocity, angle);
             },
             Ok(_) => {},
             Err(_) => {}
