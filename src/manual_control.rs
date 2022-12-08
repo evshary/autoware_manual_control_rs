@@ -138,6 +138,7 @@ impl<'a> ManualController<'a> {
             let real_target_velocity = target_velocity.load(Ordering::Relaxed) *
                                        (if gear_cmd.load(Ordering::Relaxed) == 2 { 1.0 } else { -1.0 });
             let acceleration = num::clamp(target_velocity.load(Ordering::Relaxed) - current_velocity.load(Ordering::Relaxed).abs(), -1.0, 1.0);
+            // TODO: This should be filled with current time
             let empty_time = TimeStamp { sec: 0, nsec: 0 };
             let control_cmd = AckermannControlCommand {
                 ts: empty_time.clone(),
@@ -155,7 +156,7 @@ impl<'a> ManualController<'a> {
             };
             let encoded = cdr::serialize::<_, _, CdrLe>(&control_cmd, Infinite).unwrap();
             publisher_control_command.put(encoded).res().unwrap();
-            thread::sleep(Duration::from_millis(33));
+            thread::sleep(Duration::from_millis(33));  // 30 Hz
         }});
     }
 
@@ -204,6 +205,7 @@ impl<'a> ManualController<'a> {
             _ => "Unknown",
         };
         s += "\tGear:";
+        // TODO: Use const for gear command
         s += match self.gear_command.load(Ordering::Relaxed) {
             2 => "D",
             20 => "R",
@@ -215,6 +217,7 @@ impl<'a> ManualController<'a> {
     }
 }
 
+// TODO: The types here should be separted
 #[derive(Serialize, Deserialize, PartialEq, Clone)]
 struct TimeStamp {
     sec: i32,
@@ -253,6 +256,7 @@ struct ResponseStatus {
 }
 */
 
+// TODO: Use const for gear command
 #[derive(Serialize, Deserialize, PartialEq)]
 struct GearCommand {
     ts: TimeStamp,

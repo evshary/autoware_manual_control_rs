@@ -34,6 +34,8 @@ fn main() {
     let mut velocity = 0.0;  // m/s
     let mut angle = 0.0;     // radian
 
+    // TODO: Add argument for scope
+    // TODO: Able to read config from CLI
     let z_session = Arc::new(zenoh::open(config::peer()).res().unwrap());
     let mut manual_controller = ManualController::new(z_session.clone());
     manual_controller.init(z_session.clone());
@@ -49,6 +51,7 @@ fn main() {
                 println!("Toggle to {}\r", new_mode);
             },
             Ok(Event::Key(KeyEvent {code: KeyCode::Char('x'), modifiers: _, kind: _, state: _})) => {
+                // TODO: Use const for gear command
                 manual_controller.pub_gear_command(2);
                 println!("Switch to DRIVE mode\r");
             },
