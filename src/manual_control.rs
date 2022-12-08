@@ -4,7 +4,7 @@ use zenoh::publication::Publisher;
 use zenoh::buffers::reader::HasReader;
 use serde_derive::{Serialize, Deserialize};
 use cdr::{CdrLe, Infinite};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use atomic_float::{AtomicF32};
 use std::thread;
@@ -31,7 +31,7 @@ pub struct ManualController<'a> {
 }
 
 impl<'a> ManualController<'a> {
-    pub fn new(z_session: &'a Session) -> Self {
+    pub fn new(z_session: Arc<Session>) -> Self {
         let publisher_gate_mode = z_session
             .declare_publisher("rt/control/gate_mode_cmd")
             .res()
@@ -66,7 +66,7 @@ impl<'a> ManualController<'a> {
         }
     }
 
-    pub fn init(&mut self, z_session: &'a Session) {
+    pub fn init(&mut self, z_session: Arc<Session>) {
         let gate_mode = self.gate_mode.clone();
         self._subscriber_gate_mode = Some(z_session
             .declare_subscriber("rt/control/current_gate_mode")
@@ -128,13 +128,13 @@ impl<'a> ManualController<'a> {
         let target_velocity = self.target_velocity.clone();
         let gear_cmd = self.gear_command.clone();
         let current_velocity = self.current_velocity.clone();
-        //let publisher_control_command = Arc::new(Mutex::new(z_session
-        //    .declare_publisher("rt/external/selected/control_cmd")
-        //    .res()
-        //    .unwrap()));
+        let publisher_control_command = Arc::new(z_session
+            .declare_publisher("rt/external/selected/control_cmd")
+            .res()
+            .unwrap());
         thread::spawn(move || { loop {
-            println!("v:{} angle:{}\r", steering_tire_angle.load(Ordering::Relaxed),
-                                        target_velocity.load(Ordering::Relaxed));
+            //println!("v:{} angle:{}\r", target_velocity.load(Ordering::Relaxed),
+            //                            steering_tire_angle.load(Ordering::Relaxed));
             let real_target_velocity = target_velocity.load(Ordering::Relaxed) *
                                        (if gear_cmd.load(Ordering::Relaxed) == 2 { 1.0 } else { -1.0 });
             let acceleration = num::clamp(target_velocity.load(Ordering::Relaxed) - current_velocity.load(Ordering::Relaxed).abs(), -1.0, 1.0);
@@ -154,7 +154,7 @@ impl<'a> ManualController<'a> {
                 },
             };
             let encoded = cdr::serialize::<_, _, CdrLe>(&control_cmd, Infinite).unwrap();
-            //publisher_control_command.lock().unwrap().put(encoded).res().unwrap();
+            publisher_control_command.put(encoded).res().unwrap();
             thread::sleep(Duration::from_millis(33));
         }});
     }

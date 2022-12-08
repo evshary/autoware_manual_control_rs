@@ -3,6 +3,7 @@ mod manual_control;
 use zenoh::prelude::sync::*;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use manual_control::ManualController;
+use std::sync::Arc;
 
 const MAX_STEER_ANGLE  : f32 = 0.3925; // 22.5 * (PI / 180)
 const STEP_STEER_ANGLE : f32 = 0.0174; // 1 * (PI / 180)
@@ -32,9 +33,9 @@ fn main() {
     let mut velocity = 0.0;  // m/s
     let mut angle = 0.0;     // radian
 
-    let z_session = zenoh::open(config::peer()).res().unwrap();
-    let mut manual_controller = ManualController::new(&z_session);
-    manual_controller.init(&z_session);
+    let z_session = Arc::new(zenoh::open(config::peer()).res().unwrap());
+    let mut manual_controller = ManualController::new(z_session.clone());
+    manual_controller.init(z_session.clone());
     print_help();
     crossterm::terminal::enable_raw_mode().unwrap();
     loop {
