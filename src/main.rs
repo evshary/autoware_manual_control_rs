@@ -2,8 +2,9 @@ mod manual_control;
 
 use zenoh::prelude::sync::*;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
-use manual_control::ManualController;
 use std::sync::Arc;
+use std::f32::consts;
+use manual_control::ManualController;
 
 const MAX_STEER_ANGLE  : f32 = 0.3925; // 22.5 * (PI / 180)
 const STEP_STEER_ANGLE : f32 = 0.0174; // 1 * (PI / 180)
@@ -44,46 +45,38 @@ fn main() {
                 break;
             },
             Ok(Event::Key(KeyEvent {code: KeyCode::Char('z'), modifiers: _, kind: _, state: _})) => {
-                manual_controller.toggle_gate_mode();
+                let new_mode = if manual_controller.toggle_gate_mode() { "EXTERNAL" } else { "AUTO" };
+                println!("Toggle to {}\r", new_mode);
             },
             Ok(Event::Key(KeyEvent {code: KeyCode::Char('x'), modifiers: _, kind: _, state: _})) => {
                 manual_controller.pub_gear_command(2);
+                println!("Switch to DRIVE mode\r");
             },
             Ok(Event::Key(KeyEvent {code: KeyCode::Char('c'), modifiers: _, kind: _, state: _})) => {
                 manual_controller.pub_gear_command(20);
+                println!("Switch to REVERSE mode\r");
             },
             Ok(Event::Key(KeyEvent {code: KeyCode::Char('v'), modifiers: _, kind: _, state: _})) => {
                 manual_controller.pub_gear_command(22);
+                println!("Switch to PARK mode\r");
             },
             Ok(Event::Key(KeyEvent {code: KeyCode::Char('s'), modifiers: _, kind: _, state: _})) => {
                 println!("{}\r", manual_controller.get_status());
             },
-            Ok(Event::Key(KeyEvent {code: KeyCode::Char('u'), modifiers: _, kind: _, state: _})) => {
-                velocity = num::clamp(velocity + STEP_SPEED, 0.0, MAX_SPEED);
+            Ok(Event::Key(KeyEvent {code: c, modifiers: _, kind: _, state: _})) => {
+                match c {
+                    KeyCode::Char('u') => velocity = num::clamp(velocity + STEP_SPEED, 0.0, MAX_SPEED),
+                    KeyCode::Char('i') => velocity = 0.0,
+                    KeyCode::Char('o') => velocity = num::clamp(velocity - STEP_SPEED, 0.0, MAX_SPEED),
+                    KeyCode::Char('j') => angle = num::clamp(angle + STEP_STEER_ANGLE, -MAX_STEER_ANGLE, MAX_STEER_ANGLE),
+                    KeyCode::Char('k') => angle = 0.0, 
+                    KeyCode::Char('l') => angle = num::clamp(angle - STEP_STEER_ANGLE, -MAX_STEER_ANGLE, MAX_STEER_ANGLE),
+                    _ => {}
+                }
                 manual_controller.update_control_command(velocity, angle);
-            },
-            Ok(Event::Key(KeyEvent {code: KeyCode::Char('i'), modifiers: _, kind: _, state: _})) => {
-                velocity = 0.0;
-                manual_controller.update_control_command(velocity, angle);
-            },
-            Ok(Event::Key(KeyEvent {code: KeyCode::Char('o'), modifiers: _, kind: _, state: _})) => {
-                velocity = num::clamp(velocity - STEP_SPEED, 0.0, MAX_SPEED);
-                manual_controller.update_control_command(velocity, angle);
-            },
-            Ok(Event::Key(KeyEvent {code: KeyCode::Char('j'), modifiers: _, kind: _, state: _})) => {
-                angle = num::clamp(angle + STEP_STEER_ANGLE, -MAX_STEER_ANGLE, MAX_STEER_ANGLE);
-                manual_controller.update_control_command(velocity, angle);
-            },
-            Ok(Event::Key(KeyEvent {code: KeyCode::Char('k'), modifiers: _, kind: _, state: _})) => {
-                angle = 0.0;
-                manual_controller.update_control_command(velocity, angle);
-            },
-            Ok(Event::Key(KeyEvent {code: KeyCode::Char('l'), modifiers: _, kind: _, state: _})) => {
-                angle = num::clamp(angle - STEP_STEER_ANGLE, -MAX_STEER_ANGLE, MAX_STEER_ANGLE);
-                manual_controller.update_control_command(velocity, angle);
-            },
-            Ok(_) => {},
-            Err(_) => {}
+                println!("angle(deg):{}\tvelocity(km/hr):{}\r", (angle * 180.0 / consts::PI), (velocity * 3600.0 / 1000.0));
+            }
+            _ => {},
         }
     }
     crossterm::terminal::disable_raw_mode().unwrap();

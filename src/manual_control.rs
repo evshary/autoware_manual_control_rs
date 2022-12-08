@@ -172,12 +172,14 @@ impl<'a> ManualController<'a> {
         self.client_engage_req.put(encoded).res().unwrap();
     }
 
-    pub fn toggle_gate_mode(&self) {
+    pub fn toggle_gate_mode(&self) -> bool {  // Return whether switch to external or not
         if self.gate_mode.load(Ordering::Relaxed) == 0 { // Auto
             self.pub_gate_mode(1);
             self.send_client_engage();
+            true
         } else { // External
             self.pub_gate_mode(0);
+            false
         }
     }
 
