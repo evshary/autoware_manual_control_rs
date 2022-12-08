@@ -4,7 +4,7 @@ use zenoh::publication::Publisher;
 use zenoh::buffers::reader::HasReader;
 use serde_derive::{Serialize, Deserialize};
 use cdr::{CdrLe, Infinite};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use atomic_float::{AtomicF32};
 use std::thread;
@@ -15,7 +15,6 @@ pub struct ManualController<'a> {
     publisher_gate_mode: Publisher<'a>,
     client_engage_req: Publisher<'a>,
     publisher_gear_command: Publisher<'a>,
-    publisher_control_command: Publisher<'a>,
     // subscriber
     _subscriber_gate_mode: Option<Subscriber<'a, ()>>,
     _subscriber_engage: Option<Subscriber<'a, ()>>,
@@ -45,17 +44,12 @@ impl<'a> ManualController<'a> {
             .declare_publisher("rt/external/selected/gear_cmd")
             .res()
             .unwrap();
-        let publisher_control_command = z_session
-            .declare_publisher("rt/external/selected/control_cmd")
-            .res()
-            .unwrap();
 
         ManualController {
             // publisher
             publisher_gate_mode,
             client_engage_req,
             publisher_gear_command,
-            publisher_control_command,
             // subscriber
             _subscriber_gate_mode: None,
             _subscriber_engage: None,
@@ -132,9 +126,35 @@ impl<'a> ManualController<'a> {
         
         let steering_tire_angle = self.steering_tire_angle.clone();
         let target_velocity = self.target_velocity.clone();
-        thread::spawn(move || {loop {
+        let gear_cmd = self.gear_command.clone();
+        let current_velocity = self.current_velocity.clone();
+        //let publisher_control_command = Arc::new(Mutex::new(z_session
+        //    .declare_publisher("rt/external/selected/control_cmd")
+        //    .res()
+        //    .unwrap()));
+        thread::spawn(move || { loop {
             println!("v:{} angle:{}\r", steering_tire_angle.load(Ordering::Relaxed),
                                         target_velocity.load(Ordering::Relaxed));
+            let real_target_velocity = target_velocity.load(Ordering::Relaxed) *
+                                       (if gear_cmd.load(Ordering::Relaxed) == 2 { 1.0 } else { -1.0 });
+            let acceleration = num::clamp(target_velocity.load(Ordering::Relaxed) - current_velocity.load(Ordering::Relaxed).abs(), -1.0, 1.0);
+            let empty_time = TimeStamp { sec: 0, nsec: 0 };
+            let control_cmd = AckermannControlCommand {
+                ts: empty_time.clone(),
+                lateral: AckermannLateralCommand { 
+                    ts: empty_time.clone(),
+                    steering_tire_angle: steering_tire_angle.load(Ordering::Relaxed),
+                    steering_tire_rotation_rate: 0.0,
+                },
+                longitudinal: LongitudinalCommand {
+                    ts: empty_time.clone(),
+                    speed: real_target_velocity,
+                    acceleration,
+                    jerk: 0.0,
+                },
+            };
+            let encoded = cdr::serialize::<_, _, CdrLe>(&control_cmd, Infinite).unwrap();
+            //publisher_control_command.lock().unwrap().put(encoded).res().unwrap();
             thread::sleep(Duration::from_millis(33));
         }});
     }
@@ -193,7 +213,7 @@ impl<'a> ManualController<'a> {
     }
 }
 
-#[derive(Serialize, Deserialize, PartialEq)]
+#[derive(Serialize, Deserialize, PartialEq, Clone)]
 struct TimeStamp {
     sec: i32,
     nsec: u32,
@@ -253,4 +273,26 @@ struct CurrentVelocity {
     longitudinal_velocity: f32,
     lateral_velocity: f32,
     heading_rate: f32,
+}
+
+#[derive(Serialize, Deserialize, PartialEq)]
+struct AckermannLateralCommand {
+    ts: TimeStamp,
+    steering_tire_angle: f32,
+    steering_tire_rotation_rate: f32,
+}
+
+#[derive(Serialize, Deserialize, PartialEq)]
+struct LongitudinalCommand {
+    ts: TimeStamp,
+    speed: f32,
+    acceleration: f32,
+    jerk: f32,
+}
+
+#[derive(Serialize, Deserialize, PartialEq)]
+struct AckermannControlCommand {
+    ts: TimeStamp,
+    lateral: AckermannLateralCommand,
+    longitudinal: LongitudinalCommand, 
 }
