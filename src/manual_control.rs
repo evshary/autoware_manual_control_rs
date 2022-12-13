@@ -6,7 +6,7 @@ use serde_derive::{Serialize, Deserialize};
 use cdr::{CdrLe, Infinite};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
-use atomic_float::{AtomicF32};
+use atomic_float::AtomicF32;
 use std::thread;
 use std::time::Duration;
 
@@ -256,15 +256,15 @@ struct ResponseStatus {
 }
 */
 
-// TODO: Use const for gear command
+pub const GEAR_CMD_DRIVE   : u8 = 2;
+pub const GEAR_CMD_REVERSE : u8 = 20;
+pub const GEAR_CMD_PARK    : u8 = 22;
+#[allow(dead_code)]
+pub const GEAR_CMD_LOW     : u8 = 23;
 #[derive(Serialize, Deserialize, PartialEq)]
 struct GearCommand {
     ts: TimeStamp,
     command: u8,
-    // DRIVE = 2;
-    // REVERSE = 20;
-    // PARK = 22;
-    // LOW = 23;
 }
 
 #[derive(Serialize, Deserialize, PartialEq)]
