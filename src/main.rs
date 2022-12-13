@@ -1,12 +1,11 @@
 mod manual_control;
+mod autoware_type;
 
 use zenoh::prelude::sync::*;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use std::sync::Arc;
 use std::f32::consts;
 use manual_control::ManualController;
-
-use crate::manual_control::{GEAR_CMD_DRIVE, GEAR_CMD_REVERSE, GEAR_CMD_PARK};
 
 const MAX_STEER_ANGLE  : f32 = 0.3925; // 22.5 * (PI / 180)
 const STEP_STEER_ANGLE : f32 = 0.0174; // 1 * (PI / 180)
@@ -54,15 +53,15 @@ fn main() {
             },
             Ok(Event::Key(KeyEvent {code: KeyCode::Char('x'), modifiers: _, kind: _, state: _})) => {
                 // TODO: Use const for gear command
-                manual_controller.pub_gear_command(GEAR_CMD_DRIVE);
+                manual_controller.pub_gear_command(autoware_type::GEAR_CMD_DRIVE);
                 println!("Switch to DRIVE mode\r");
             },
             Ok(Event::Key(KeyEvent {code: KeyCode::Char('c'), modifiers: _, kind: _, state: _})) => {
-                manual_controller.pub_gear_command(GEAR_CMD_REVERSE);
+                manual_controller.pub_gear_command(autoware_type::GEAR_CMD_REVERSE);
                 println!("Switch to REVERSE mode\r");
             },
             Ok(Event::Key(KeyEvent {code: KeyCode::Char('v'), modifiers: _, kind: _, state: _})) => {
-                manual_controller.pub_gear_command(GEAR_CMD_PARK);
+                manual_controller.pub_gear_command(autoware_type::GEAR_CMD_PARK);
                 println!("Switch to PARK mode\r");
             },
             Ok(Event::Key(KeyEvent {code: KeyCode::Char('s'), modifiers: _, kind: _, state: _})) => {

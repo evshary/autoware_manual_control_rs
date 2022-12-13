@@ -2,13 +2,14 @@ use zenoh::prelude::sync::*;
 use zenoh::subscriber::Subscriber;
 use zenoh::publication::Publisher;
 use zenoh::buffers::reader::HasReader;
-use serde_derive::{Serialize, Deserialize};
 use cdr::{CdrLe, Infinite};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use atomic_float::AtomicF32;
 use std::thread;
 use std::time::Duration;
+
+use crate::autoware_type;
 
 pub struct ManualController<'a> {
     // publisher
@@ -71,7 +72,7 @@ impl<'a> ManualController<'a> {
         self._subscriber_gate_mode = Some(z_session
             .declare_subscriber("rt/control/current_gate_mode")
             .callback_mut(move |sample| {
-                match cdr::deserialize_from::<_, GateMode, _>(sample.payload.reader(), cdr::size::Infinite) {
+                match cdr::deserialize_from::<_, autoware_type::GateMode, _>(sample.payload.reader(), cdr::size::Infinite) {
                     Ok(gatemode) => {
                         //println!("gatemode.date={}\r", gatemode.data);
                         gate_mode.store(gatemode.data, Ordering::Relaxed);
@@ -85,7 +86,7 @@ impl<'a> ManualController<'a> {
         self._subscriber_engage = Some(z_session
             .declare_subscriber("rt/api/autoware/get/engage")
             .callback_mut(move |sample| {
-                match cdr::deserialize_from::<_, GetEngage, _>(sample.payload.reader(), cdr::size::Infinite) {
+                match cdr::deserialize_from::<_, autoware_type::GetEngage, _>(sample.payload.reader(), cdr::size::Infinite) {
                     Ok(engage) => {
                         //println!("Engage: {}\r", engage.enable);
                         current_engage.store(engage.enable, Ordering::Relaxed);
@@ -99,7 +100,7 @@ impl<'a> ManualController<'a> {
         self._subscriber_gear_command = Some(z_session
             .declare_subscriber("rt/vehicle/status/gear_status")
             .callback_mut(move |sample| {
-                match cdr::deserialize_from::<_, GearCommand, _>(sample.payload.reader(), cdr::size::Infinite) {
+                match cdr::deserialize_from::<_, autoware_type::GearCommand, _>(sample.payload.reader(), cdr::size::Infinite) {
                     Ok(gearcmd) => {
                         //println!("GearCommand: {}\r", gearcmd.command);
                         gear_cmd.store(gearcmd.command, Ordering::Relaxed);
@@ -113,7 +114,7 @@ impl<'a> ManualController<'a> {
         self._subscriber_velocity = Some(z_session
             .declare_subscriber("rt/vehicle/status/velocity_status")
             .callback_mut(move |sample| {
-                match cdr::deserialize_from::<_, CurrentVelocity, _>(sample.payload.reader(), cdr::size::Infinite) {
+                match cdr::deserialize_from::<_, autoware_type::CurrentVelocity, _>(sample.payload.reader(), cdr::size::Infinite) {
                     Ok(velocity) => {
                         //println!("Velocity: {}\r", velocity.longitudinal_velocity);
                         current_velocity.store(velocity.longitudinal_velocity, Ordering::Relaxed);
@@ -139,15 +140,15 @@ impl<'a> ManualController<'a> {
                                        (if gear_cmd.load(Ordering::Relaxed) == 2 { 1.0 } else { -1.0 });
             let acceleration = num::clamp(target_velocity.load(Ordering::Relaxed) - current_velocity.load(Ordering::Relaxed).abs(), -1.0, 1.0);
             // TODO: This should be filled with current time
-            let empty_time = TimeStamp { sec: 0, nsec: 0 };
-            let control_cmd = AckermannControlCommand {
+            let empty_time = autoware_type::TimeStamp { sec: 0, nsec: 0 };
+            let control_cmd = autoware_type::AckermannControlCommand {
                 ts: empty_time.clone(),
-                lateral: AckermannLateralCommand { 
+                lateral: autoware_type::AckermannLateralCommand { 
                     ts: empty_time.clone(),
                     steering_tire_angle: steering_tire_angle.load(Ordering::Relaxed),
                     steering_tire_rotation_rate: 0.0,
                 },
-                longitudinal: LongitudinalCommand {
+                longitudinal: autoware_type::LongitudinalCommand {
                     ts: empty_time.clone(),
                     speed: real_target_velocity,
                     acceleration,
@@ -161,14 +162,14 @@ impl<'a> ManualController<'a> {
     }
 
     fn pub_gate_mode(&self, mode: u8) {
-        let gate_mode_data = GateMode { data: mode };
+        let gate_mode_data = autoware_type::GateMode { data: mode };
         let encoded = cdr::serialize::<_, _, CdrLe>(&gate_mode_data, Infinite).unwrap();
         self.publisher_gate_mode.put(encoded).res().unwrap();
     }
 
     fn send_client_engage(&self) {
         // TODO: We assign GUID and seq to 0, but this should be filled with meaningful value.
-        let engage_data = Engage { header: ServiceHeader { guid: 0, seq: 0 }, enable: true };
+        let engage_data = autoware_type::Engage { header: autoware_type::ServiceHeader { guid: 0, seq: 0 }, enable: true };
         let encoded = cdr::serialize::<_, _, CdrLe>(&engage_data, Infinite).unwrap();
         self.client_engage_req.put(encoded).res().unwrap();
     }
@@ -185,7 +186,7 @@ impl<'a> ManualController<'a> {
     }
 
     pub fn pub_gear_command(&self, command: u8) {
-        let gear_command = GearCommand { ts: TimeStamp { sec: 0, nsec: 0 }, command: command };
+        let gear_command = autoware_type::GearCommand { ts: autoware_type::TimeStamp { sec: 0, nsec: 0 }, command: command };
         let encoded = cdr::serialize::<_, _, CdrLe>(&gear_command, Infinite).unwrap();
         self.publisher_gear_command.put(encoded).res().unwrap();
     }
@@ -215,90 +216,4 @@ impl<'a> ManualController<'a> {
         };
         s
     }
-}
-
-// TODO: The types here should be separted
-#[derive(Serialize, Deserialize, PartialEq, Clone)]
-struct TimeStamp {
-    sec: i32,
-    nsec: u32,
-}
-
-#[derive(Serialize, Deserialize, PartialEq)]
-struct ServiceHeader {
-    guid: i64,
-    seq: u64,
-}
-
-#[derive(Serialize, Deserialize, PartialEq)]
-struct GateMode {
-    data: u8,  // 0: AUTO, 1: EXTERNAL
-}
-
-#[derive(Serialize, Deserialize, PartialEq)]
-struct GetEngage {
-    ts: TimeStamp,
-    enable: bool,
-}
-
-#[derive(Serialize, Deserialize, PartialEq)]
-struct Engage {
-    header: ServiceHeader,
-    enable: bool,
-}
-
-/* We don't need to get service response currently
-#[derive(Serialize, Deserialize, PartialEq)]
-struct ResponseStatus {
-    header: ServiceHeader,
-    code: u32,
-    message: String,
-}
-*/
-
-pub const GEAR_CMD_DRIVE   : u8 = 2;
-pub const GEAR_CMD_REVERSE : u8 = 20;
-pub const GEAR_CMD_PARK    : u8 = 22;
-#[allow(dead_code)]
-pub const GEAR_CMD_LOW     : u8 = 23;
-#[derive(Serialize, Deserialize, PartialEq)]
-struct GearCommand {
-    ts: TimeStamp,
-    command: u8,
-}
-
-#[derive(Serialize, Deserialize, PartialEq)]
-struct StdMsgsHeader {
-    ts: TimeStamp,
-    frameid: String,
-}
-
-#[derive(Serialize, Deserialize, PartialEq)]
-struct CurrentVelocity {
-    header: StdMsgsHeader,
-    longitudinal_velocity: f32,
-    lateral_velocity: f32,
-    heading_rate: f32,
-}
-
-#[derive(Serialize, Deserialize, PartialEq)]
-struct AckermannLateralCommand {
-    ts: TimeStamp,
-    steering_tire_angle: f32,
-    steering_tire_rotation_rate: f32,
-}
-
-#[derive(Serialize, Deserialize, PartialEq)]
-struct LongitudinalCommand {
-    ts: TimeStamp,
-    speed: f32,
-    acceleration: f32,
-    jerk: f32,
-}
-
-#[derive(Serialize, Deserialize, PartialEq)]
-struct AckermannControlCommand {
-    ts: TimeStamp,
-    lateral: AckermannLateralCommand,
-    longitudinal: LongitudinalCommand, 
 }
