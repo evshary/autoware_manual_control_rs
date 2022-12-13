@@ -128,10 +128,10 @@ impl<'a> ManualController<'a> {
         let target_velocity = self.target_velocity.clone();
         let gear_cmd = self.gear_command.clone();
         let current_velocity = self.current_velocity.clone();
-        let publisher_control_command = Arc::new(z_session
+        let publisher_control_command = z_session
             .declare_publisher("rt/external/selected/control_cmd")
             .res()
-            .unwrap());
+            .unwrap();
         thread::spawn(move || { loop {
             //println!("v:{} angle:{}\r", target_velocity.load(Ordering::Relaxed),
             //                            steering_tire_angle.load(Ordering::Relaxed));
