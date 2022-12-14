@@ -5,6 +5,8 @@ use zenoh::prelude::sync::*;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use std::sync::Arc;
 use std::f32::consts;
+use clap::{App, Arg};
+
 use manual_control::ManualController;
 
 const MAX_STEER_ANGLE  : f32 = 0.3925; // 22.5 * (PI / 180)
@@ -31,14 +33,47 @@ fn print_help() {
     println!("------------------------------------");
 }
 
+fn parse_args() -> (Config, String) {
+    let app = App::new("Autoware keyboard controller with Zenoh")
+        .version("0.1.0")
+        .arg(Arg::from_usage(
+r#"-c, --config=[FILE] \
+'The configuration file. Currently, this file must be a valid JSON5 file.'"#,
+            ))
+        .arg(Arg::from_usage(
+r#"-l, --listen=[ENDPOINT]... \
+'A locator on which this router will listen for incoming sessions.
+Repeat this option to open several listeners.'"#,
+                ),
+            )
+        .arg(Arg::from_usage(
+r#"-s, --scope=[String]   'A string added as prefix to all routed DDS topics when mapped to a zenoh resource. This should be used to avoid conflicts when several distinct DDS systems using the same topics names are routed via zenoh'"#
+            ));
+    let args = app.get_matches();
+    let mut config = match args.value_of("config") {
+        Some(conf_file) => Config::from_file(conf_file).unwrap(),
+        None => Config::default(),
+    };
+    if let Some(endpoints) = args.values_of("listen") {
+        config
+            .listen
+            .endpoints
+            .extend(endpoints.map(|p| p.parse().unwrap()))
+    }
+    let scope = match args.value_of("scope") {
+        Some(s) => s.to_string() + "/",
+        None => String::from(""),
+    };
+    (config, scope)
+}
+
 fn main() {
     let mut velocity = 0.0;  // m/s
     let mut angle = 0.0;     // radian
 
-    // TODO: Add argument for scope
-    // TODO: Able to read config from CLI
-    let z_session = Arc::new(zenoh::open(config::peer()).res().unwrap());
-    let mut manual_controller = ManualController::new(z_session.clone());
+    let (config, scope) = parse_args();
+    let z_session = Arc::new(zenoh::open(config).res().unwrap());
+    let mut manual_controller = ManualController::new(z_session.clone(), scope);
     manual_controller.init(z_session.clone());
     print_help();
     crossterm::terminal::enable_raw_mode().unwrap();
@@ -52,7 +87,6 @@ fn main() {
                 println!("Toggle to {}\r", new_mode);
             },
             Ok(Event::Key(KeyEvent {code: KeyCode::Char('x'), modifiers: _, kind: _, state: _})) => {
-                // TODO: Use const for gear command
                 manual_controller.pub_gear_command(autoware_type::GEAR_CMD_DRIVE);
                 println!("Switch to DRIVE mode\r");
             },

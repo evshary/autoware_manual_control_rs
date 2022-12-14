@@ -224,6 +224,7 @@ version = "0.1.0"
 dependencies = [
  "atomic_float",
  "cdr",
+ "clap",
  "crossterm",
  "num",
  "serde",

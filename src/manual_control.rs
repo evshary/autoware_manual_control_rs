@@ -12,6 +12,8 @@ use std::time::Duration;
 use crate::autoware_type;
 
 pub struct ManualController<'a> {
+    // scope
+    scope: String,
     // publisher
     publisher_gate_mode: Publisher<'a>,
     client_engage_req: Publisher<'a>,
@@ -32,21 +34,23 @@ pub struct ManualController<'a> {
 }
 
 impl<'a> ManualController<'a> {
-    pub fn new(z_session: Arc<Session>) -> Self {
+    pub fn new(z_session: Arc<Session>, scope: String) -> Self {
         let publisher_gate_mode = z_session
-            .declare_publisher("rt/control/gate_mode_cmd")
+            .declare_publisher(scope.clone()+"rt/control/gate_mode_cmd")
             .res()
             .unwrap();
         let client_engage_req = z_session
-            .declare_publisher("rq/api/autoware/set/engageRequest")
+            .declare_publisher(scope.clone()+"rq/api/autoware/set/engageRequest")
             .res()
             .unwrap();
         let publisher_gear_command = z_session
-            .declare_publisher("rt/external/selected/gear_cmd")
+            .declare_publisher(scope.clone()+"rt/external/selected/gear_cmd")
             .res()
             .unwrap();
 
         ManualController {
+            // scope
+            scope,
             // publisher
             publisher_gate_mode,
             client_engage_req,
@@ -70,7 +74,7 @@ impl<'a> ManualController<'a> {
     pub fn init(&mut self, z_session: Arc<Session>) {
         let gate_mode = self.gate_mode.clone();
         self._subscriber_gate_mode = Some(z_session
-            .declare_subscriber("rt/control/current_gate_mode")
+            .declare_subscriber(self.scope.clone()+"rt/control/current_gate_mode")
             .callback_mut(move |sample| {
                 match cdr::deserialize_from::<_, autoware_type::GateMode, _>(sample.payload.reader(), cdr::size::Infinite) {
                     Ok(gatemode) => {
@@ -84,7 +88,7 @@ impl<'a> ManualController<'a> {
             .unwrap());
         let current_engage = self.current_engage.clone();
         self._subscriber_engage = Some(z_session
-            .declare_subscriber("rt/api/autoware/get/engage")
+            .declare_subscriber(self.scope.clone()+"rt/api/autoware/get/engage")
             .callback_mut(move |sample| {
                 match cdr::deserialize_from::<_, autoware_type::GetEngage, _>(sample.payload.reader(), cdr::size::Infinite) {
                     Ok(engage) => {
@@ -98,7 +102,7 @@ impl<'a> ManualController<'a> {
             .unwrap());
         let gear_cmd = self.gear_command.clone();
         self._subscriber_gear_command = Some(z_session
-            .declare_subscriber("rt/vehicle/status/gear_status")
+            .declare_subscriber(self.scope.clone()+"rt/vehicle/status/gear_status")
             .callback_mut(move |sample| {
                 match cdr::deserialize_from::<_, autoware_type::GearCommand, _>(sample.payload.reader(), cdr::size::Infinite) {
                     Ok(gearcmd) => {
@@ -112,7 +116,7 @@ impl<'a> ManualController<'a> {
             .unwrap());
         let current_velocity = self.current_velocity.clone();
         self._subscriber_velocity = Some(z_session
-            .declare_subscriber("rt/vehicle/status/velocity_status")
+            .declare_subscriber(self.scope.clone()+"rt/vehicle/status/velocity_status")
             .callback_mut(move |sample| {
                 match cdr::deserialize_from::<_, autoware_type::CurrentVelocity, _>(sample.payload.reader(), cdr::size::Infinite) {
                     Ok(velocity) => {
@@ -130,7 +134,7 @@ impl<'a> ManualController<'a> {
         let gear_cmd = self.gear_command.clone();
         let current_velocity = self.current_velocity.clone();
         let publisher_control_command = z_session
-            .declare_publisher("rt/external/selected/control_cmd")
+            .declare_publisher(self.scope.clone()+"rt/external/selected/control_cmd")
             .res()
             .unwrap();
         thread::spawn(move || { loop {
