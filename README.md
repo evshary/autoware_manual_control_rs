@@ -6,18 +6,75 @@ Note that the program should run with zenoh-bridge-dds.
 
 # Build
 
-* Build
+* Build autoware_manual_control_rs
 
 ```shell
+cd ~
 git clone https://github.com/evshary/autoware_manual_control_rs.git
 cd autoware_manual_control_rs
-cargo build
+cargo build --release
 ```
 
-* Run
+* Build zenoh-bridge-dds
 
 ```shell
-cargo run
+git clone https://github.com/eclipse-zenoh/zenoh-plugin-dds.git
+cd zenoh-plugin-dds
+# Note that the zenoh version of autoware_manual_control_rs and zenoh-bridge-dds should match
+git checkout 11212d6b5e20947d643ab5547b0c1ef0c09c5323
+cargo build --release -p zenoh-bridge-dds
+```
+
+* Create `myconfig.json` under zenoh-bridge-dds
+  - We want to set the topic filter
+
+```json
+{
+    plugins: {
+        dds: {
+            allow: "/external/selected/control_cmd|/external/selected/gear_cmd|/control/gate_mode_cmd|/api/autoware/set/engage|/control/current_gate_mode|/api/autoware/get/engage|/vehicle/status/velocity_status|/vehicle/status/gear_status"
+        }
+    }
+}
+```
+
+# Run
+
+* 1st terminal: Run Autoware1
+
+```shell
+rocker --network host --privileged --x11 --user --volume $HOME/autoware_map -- ghcr.io/autowarefoundation/autoware-universe:latest-prebuilt bash
+# Inside the docker
+ROS_DOMAIN_ID=1 ros2 launch autoware_launch planning_simulator.launch.xml map_path:=$HOME/autoware_map/sample-map-planning vehicle_model:=sample_vehicle sensor_model:=sample_sensor_kit
+```
+
+* 2nd terminal: Run Autoware2
+
+```shell
+rocker --network host --privileged --x11 --user --volume $HOME/autoware_map -- ghcr.io/autowarefoundation/autoware-universe:latest-prebuilt bash
+# Inside the docker
+ROS_DOMAIN_ID=2 ros2 launch autoware_launch planning_simulator.launch.xml map_path:=$HOME/autoware_map/sample-map-planning vehicle_model:=sample_vehicle sensor_model:=sample_sensor_kit
+```
+
+* 3rd terminal: Run zenoh-bridge-dds for Autoware1
+
+```shell
+cd ~/zenoh-bridge-dds
+./target/release/zenoh-bridge-dds -c myconfig.json5 -s "v1" -d 1
+```
+
+* 4th terminal: Run zenoh-bridge-dds for Autoware2
+
+```shell
+cd ~/zenoh-bridge-dds
+./target/release/zenoh-bridge-dds -c myconfig.json5 -s "v2" -d 2
+```
+
+* 5th terminal: Run manual_control for two vehicles
+
+```shell
+cd ~/autoware_manual_control_rs
+./target/release/autoware_manual_control -s "*"
 ```
 
 # Usage
