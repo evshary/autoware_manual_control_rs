@@ -30,9 +30,9 @@ cargo build --release -p zenoh-bridge-dds
 
 ```json
 {
-    plugins: {
-        dds: {
-            allow: "/external/selected/control_cmd|/external/selected/gear_cmd|/control/gate_mode_cmd|/api/autoware/set/engage|/control/current_gate_mode|/api/autoware/get/engage|/vehicle/status/velocity_status|/vehicle/status/gear_status"
+    "plugins": {
+        "dds": {
+            "allow": "/external/selected/control_cmd|/external/selected/gear_cmd|/control/gate_mode_cmd|/api/autoware/set/engage|/control/current_gate_mode|/api/autoware/get/engage|/vehicle/status/velocity_status|/vehicle/status/gear_status"
         }
     }
 }
