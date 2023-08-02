@@ -7,8 +7,7 @@ use std::time::Duration;
 use zenoh::prelude::sync::*;
 use zenoh::publication::Publisher;
 use zenoh::subscriber::Subscriber;
-
-use crate::autoware_type;
+use zenoh_ros_type::autoware_msgs;
 
 pub struct ManualController<'a> {
     // scope
@@ -76,7 +75,7 @@ impl<'a> ManualController<'a> {
             z_session
                 .declare_subscriber(self.scope.clone() + "rt/control/current_gate_mode")
                 .callback_mut(move |sample| {
-                    match cdr::deserialize_from::<_, autoware_type::GateMode, _>(
+                    match cdr::deserialize_from::<_, autoware_msgs::GateMode, _>(
                         &*sample.payload.contiguous(),
                         cdr::size::Infinite,
                     ) {
@@ -95,7 +94,7 @@ impl<'a> ManualController<'a> {
             z_session
                 .declare_subscriber(self.scope.clone() + "rt/api/autoware/get/engage")
                 .callback_mut(move |sample| {
-                    match cdr::deserialize_from::<_, autoware_type::GetEngage, _>(
+                    match cdr::deserialize_from::<_, autoware_msgs::GetEngage, _>(
                         &*sample.payload.contiguous(),
                         cdr::size::Infinite,
                     ) {
@@ -114,7 +113,7 @@ impl<'a> ManualController<'a> {
             z_session
                 .declare_subscriber(self.scope.clone() + "rt/vehicle/status/gear_status")
                 .callback_mut(move |sample| {
-                    match cdr::deserialize_from::<_, autoware_type::GearCommand, _>(
+                    match cdr::deserialize_from::<_, autoware_msgs::GearCommand, _>(
                         &*sample.payload.contiguous(),
                         cdr::size::Infinite,
                     ) {
@@ -133,7 +132,7 @@ impl<'a> ManualController<'a> {
             z_session
                 .declare_subscriber(self.scope.clone() + "rt/vehicle/status/velocity_status")
                 .callback_mut(move |sample| {
-                    match cdr::deserialize_from::<_, autoware_type::CurrentVelocity, _>(
+                    match cdr::deserialize_from::<_, autoware_msgs::CurrentVelocity, _>(
                         &*sample.payload.contiguous(),
                         cdr::size::Infinite,
                     ) {
@@ -174,15 +173,15 @@ impl<'a> ManualController<'a> {
                     1.0,
                 );
                 // TODO: This should be filled with current time
-                let empty_time = autoware_type::TimeStamp { sec: 0, nsec: 0 };
-                let control_cmd = autoware_type::AckermannControlCommand {
+                let empty_time = autoware_msgs::TimeStamp { sec: 0, nsec: 0 };
+                let control_cmd = autoware_msgs::AckermannControlCommand {
                     ts: empty_time.clone(),
-                    lateral: autoware_type::AckermannLateralCommand {
+                    lateral: autoware_msgs::AckermannLateralCommand {
                         ts: empty_time.clone(),
                         steering_tire_angle: steering_tire_angle.load(Ordering::Relaxed),
                         steering_tire_rotation_rate: 0.0,
                     },
-                    longitudinal: autoware_type::LongitudinalCommand {
+                    longitudinal: autoware_msgs::LongitudinalCommand {
                         ts: empty_time.clone(),
                         speed: real_target_velocity,
                         acceleration,
@@ -197,15 +196,15 @@ impl<'a> ManualController<'a> {
     }
 
     fn pub_gate_mode(&self, mode: u8) {
-        let gate_mode_data = autoware_type::GateMode { data: mode };
+        let gate_mode_data = autoware_msgs::GateMode { data: mode };
         let encoded = cdr::serialize::<_, _, CdrLe>(&gate_mode_data, Infinite).unwrap();
         self.publisher_gate_mode.put(encoded).res().unwrap();
     }
 
     fn send_client_engage(&self) {
         // TODO: We assign GUID and seq to 0, but this should be filled with meaningful value.
-        let engage_data = autoware_type::Engage {
-            header: autoware_type::ServiceHeader { guid: 0, seq: 0 },
+        let engage_data = autoware_msgs::Engage {
+            header: autoware_msgs::ServiceHeader { guid: 0, seq: 0 },
             enable: true,
         };
         let encoded = cdr::serialize::<_, _, CdrLe>(&engage_data, Infinite).unwrap();
@@ -227,8 +226,8 @@ impl<'a> ManualController<'a> {
     }
 
     pub fn pub_gear_command(&self, command: u8) {
-        let gear_command = autoware_type::GearCommand {
-            ts: autoware_type::TimeStamp { sec: 0, nsec: 0 },
+        let gear_command = autoware_msgs::GearCommand {
+            ts: autoware_msgs::TimeStamp { sec: 0, nsec: 0 },
             command: command,
         };
         let encoded = cdr::serialize::<_, _, CdrLe>(&gear_command, Infinite).unwrap();
