@@ -4,7 +4,6 @@ use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use zenoh::buffers::reader::HasReader;
 use zenoh::prelude::sync::*;
 use zenoh::publication::Publisher;
 use zenoh::subscriber::Subscriber;
@@ -78,7 +77,7 @@ impl<'a> ManualController<'a> {
                 .declare_subscriber(self.scope.clone() + "rt/control/current_gate_mode")
                 .callback_mut(move |sample| {
                     match cdr::deserialize_from::<_, autoware_type::GateMode, _>(
-                        sample.payload.reader(),
+                        &*sample.payload.contiguous(),
                         cdr::size::Infinite,
                     ) {
                         Ok(gatemode) => {
@@ -97,7 +96,7 @@ impl<'a> ManualController<'a> {
                 .declare_subscriber(self.scope.clone() + "rt/api/autoware/get/engage")
                 .callback_mut(move |sample| {
                     match cdr::deserialize_from::<_, autoware_type::GetEngage, _>(
-                        sample.payload.reader(),
+                        &*sample.payload.contiguous(),
                         cdr::size::Infinite,
                     ) {
                         Ok(engage) => {
@@ -116,7 +115,7 @@ impl<'a> ManualController<'a> {
                 .declare_subscriber(self.scope.clone() + "rt/vehicle/status/gear_status")
                 .callback_mut(move |sample| {
                     match cdr::deserialize_from::<_, autoware_type::GearCommand, _>(
-                        sample.payload.reader(),
+                        &*sample.payload.contiguous(),
                         cdr::size::Infinite,
                     ) {
                         Ok(gearcmd) => {
@@ -135,7 +134,7 @@ impl<'a> ManualController<'a> {
                 .declare_subscriber(self.scope.clone() + "rt/vehicle/status/velocity_status")
                 .callback_mut(move |sample| {
                     match cdr::deserialize_from::<_, autoware_type::CurrentVelocity, _>(
-                        sample.payload.reader(),
+                        &*sample.payload.contiguous(),
                         cdr::size::Infinite,
                     ) {
                         Ok(velocity) => {

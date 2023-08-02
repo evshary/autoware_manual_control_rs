@@ -21,7 +21,7 @@ cargo build --release
 git clone https://github.com/eclipse-zenoh/zenoh-plugin-dds.git
 cd zenoh-plugin-dds
 # Note that the zenoh version of autoware_manual_control_rs and zenoh-bridge-dds should match
-git checkout 0.7.0-rc
+git checkout 0.7.2-rc
 cargo build --release -p zenoh-bridge-dds
 ```
 
