@@ -7,7 +7,7 @@ use std::time::Duration;
 use zenoh::prelude::sync::*;
 use zenoh::publication::Publisher;
 use zenoh::subscriber::Subscriber;
-use zenoh_ros_type::autoware_msgs;
+use zenoh_ros_type::{autoware_msgs, builtin_interfaces, service};
 
 pub struct ManualController<'a> {
     // scope
@@ -173,7 +173,7 @@ impl<'a> ManualController<'a> {
                     1.0,
                 );
                 // TODO: This should be filled with current time
-                let empty_time = autoware_msgs::TimeStamp { sec: 0, nsec: 0 };
+                let empty_time = builtin_interfaces::Time { sec: 0, nsec: 0 };
                 let control_cmd = autoware_msgs::AckermannControlCommand {
                     ts: empty_time.clone(),
                     lateral: autoware_msgs::AckermannLateralCommand {
@@ -204,7 +204,7 @@ impl<'a> ManualController<'a> {
     fn send_client_engage(&self) {
         // TODO: We assign GUID and seq to 0, but this should be filled with meaningful value.
         let engage_data = autoware_msgs::Engage {
-            header: autoware_msgs::ServiceHeader { guid: 0, seq: 0 },
+            header: service::ServiceHeader { guid: 0, seq: 0 },
             enable: true,
         };
         let encoded = cdr::serialize::<_, _, CdrLe>(&engage_data, Infinite).unwrap();
@@ -227,7 +227,7 @@ impl<'a> ManualController<'a> {
 
     pub fn pub_gear_command(&self, command: u8) {
         let gear_command = autoware_msgs::GearCommand {
-            ts: autoware_msgs::TimeStamp { sec: 0, nsec: 0 },
+            ts: builtin_interfaces::Time { sec: 0, nsec: 0 },
             command: command,
         };
         let encoded = cdr::serialize::<_, _, CdrLe>(&gear_command, Infinite).unwrap();
