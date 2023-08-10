@@ -5,7 +5,7 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use std::f32::consts;
 use std::sync::Arc;
 use zenoh::prelude::sync::*;
-use zenoh_ros_type::autoware_msgs;
+use zenoh_ros_type::autoware_auto_vehicle_msgs;
 
 use manual_control::ManualController;
 
@@ -106,7 +106,7 @@ fn main() {
                 kind: _,
                 state: _,
             })) => {
-                manual_controller.pub_gear_command(autoware_msgs::GEAR_CMD_DRIVE);
+                manual_controller.pub_gear_command(autoware_auto_vehicle_msgs::gear_command::DRIVE);
                 println!("Switch to DRIVE mode\r");
             }
             Ok(Event::Key(KeyEvent {
@@ -115,7 +115,8 @@ fn main() {
                 kind: _,
                 state: _,
             })) => {
-                manual_controller.pub_gear_command(autoware_msgs::GEAR_CMD_REVERSE);
+                manual_controller
+                    .pub_gear_command(autoware_auto_vehicle_msgs::gear_command::REVERSE);
                 println!("Switch to REVERSE mode\r");
             }
             Ok(Event::Key(KeyEvent {
@@ -124,7 +125,7 @@ fn main() {
                 kind: _,
                 state: _,
             })) => {
-                manual_controller.pub_gear_command(autoware_msgs::GEAR_CMD_PARK);
+                manual_controller.pub_gear_command(autoware_auto_vehicle_msgs::gear_command::PARK);
                 println!("Switch to PARK mode\r");
             }
             Ok(Event::Key(KeyEvent {
