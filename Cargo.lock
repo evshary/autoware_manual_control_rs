@@ -957,7 +957,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cb0889898416213fab133e1d33a0e5858a48177452750691bde3666d0fdbaf8b"
 dependencies = [
  "hermit-abi 0.3.2",
- "rustix 0.38.7",
+ "rustix 0.38.8",
  "windows-sys",
 ]
 
@@ -1809,9 +1809,9 @@ dependencies = [
 
 [[package]]
 name = "rustix"
-version = "0.38.7"
+version = "0.38.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "172891ebdceb05aa0005f533a6cbfca599ddd7d966f6f5d4d9b2e70478e70399"
+checksum = "19ed4fa021d81c8392ce04db050a3da9a60299050b7ae1cf482d862b54a7218f"
 dependencies = [
  "bitflags 2.3.3",
  "errno",
@@ -3026,9 +3026,9 @@ dependencies = [
 
 [[package]]
 name = "zenoh-ros-type"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbed36f6c3b42212142e1d910a6f682c5f850aa87937c83c2097fd38fb58b245"
+checksum = "107640591e6c5b8bf3ed2c69e552fc9cd439f65863d0e6ec8a6f0453ab59b8cb"
 dependencies = [
  "serde",
  "serde_derive",

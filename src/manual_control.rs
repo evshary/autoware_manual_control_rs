@@ -176,7 +176,7 @@ impl<'a> ManualController<'a> {
                     1.0,
                 );
                 // TODO: This should be filled with current time
-                let empty_time = builtin_interfaces::Time { sec: 0, nsec: 0 };
+                let empty_time = builtin_interfaces::Time { sec: 0, nanosec: 0 };
                 let control_cmd = autoware_auto_control_msgs::AckermannControlCommand {
                     stamp: empty_time.clone(),
                     lateral: autoware_auto_control_msgs::AckermannLateralCommand {
@@ -230,7 +230,7 @@ impl<'a> ManualController<'a> {
 
     pub fn pub_gear_command(&self, command: u8) {
         let gear_command = autoware_auto_vehicle_msgs::GearCommand {
-            stamp: builtin_interfaces::Time { sec: 0, nsec: 0 },
+            stamp: builtin_interfaces::Time { sec: 0, nanosec: 0 },
             command: command,
         };
         let encoded = cdr::serialize::<_, _, CdrLe>(&gear_command, Infinite).unwrap();
