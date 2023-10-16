@@ -28,13 +28,20 @@ cargo build --release -p zenoh-bridge-dds
 * Create `myconfig.json` under zenoh-bridge-dds
   - We want to set the topic filter
 
-```json
-{
-    "plugins": {
-        "dds": {
-            "allow": "/external/selected/control_cmd|/external/selected/gear_cmd|/control/gate_mode_cmd|/api/autoware/set/engage|/control/current_gate_mode|/api/autoware/get/engage|/vehicle/status/velocity_status|/vehicle/status/gear_status"
-        }
-    }
+```json5
+{                                                                                  
+  plugins: {                                                                       
+    dds: {                                                                         
+      allow: ["/external/selected/control_cmd",
+              "/external/selected/gear_cmd",
+              "/control/gate_mode_cmd",
+              "/control/current_gate_mode",
+              "/api/autoware/set/engage",
+              "/api/autoware/get/engage",
+              "/vehicle/status/velocity_status",
+              "/vehicle/status/gear_status"]
+    }                                                                              
+  }                                                                                
 }
 ```
 
