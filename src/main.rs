@@ -1,6 +1,6 @@
 mod manual_control;
 
-use clap::{App, Arg};
+use clap::Parser;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use std::f32::consts;
 use std::sync::Arc;
@@ -33,34 +33,36 @@ fn print_help() {
     println!("------------------------------------");
 }
 
+#[derive(Parser, Default, Debug)]
+#[clap(version, about)]
+/// Autoware keyboard controller with Zenoh
+struct Arguments {
+    #[clap(short, long)]
+    /// The configuration file. Currently, this file must be a valid JSON5 file.
+    config: Option<String>,
+    #[clap(short, long)]
+    /// A locator on which this router will listen for incoming sessions.
+    /// Repeat this option to open several listeners.
+    listen: Option<Vec<String>>,
+    #[clap(short, long)]
+    /// A string added as prefix to all routed DDS topics when mapped to a zenoh resource.
+    /// This should be used to avoid conflicts when several distinct DDS systems using the same topics names are routed via zenoh.
+    scope: Option<String>,
+}
+
 fn parse_args() -> (Config, String) {
-    let app = App::new("Autoware keyboard controller with Zenoh")
-        .version("0.1.0")
-        .arg(Arg::from_usage(
-r#"-c, --config=[FILE] \
-'The configuration file. Currently, this file must be a valid JSON5 file.'"#,
-            ))
-        .arg(Arg::from_usage(
-r#"-l, --listen=[ENDPOINT]... \
-'A locator on which this router will listen for incoming sessions.
-Repeat this option to open several listeners.'"#,
-                ),
-            )
-        .arg(Arg::from_usage(
-r#"-s, --scope=[String]   'A string added as prefix to all routed DDS topics when mapped to a zenoh resource. This should be used to avoid conflicts when several distinct DDS systems using the same topics names are routed via zenoh'"#
-            ));
-    let args = app.get_matches();
-    let mut config = match args.value_of("config") {
+    let args = Arguments::parse();
+    let mut config = match args.config {
         Some(conf_file) => Config::from_file(conf_file).unwrap(),
         None => Config::default(),
     };
-    if let Some(endpoints) = args.values_of("listen") {
+    if let Some(endpoints) = args.listen {
         config
             .listen
             .endpoints
-            .extend(endpoints.map(|p| p.parse().unwrap()))
+            .extend(endpoints.iter().map(|p| p.parse().unwrap()))
     }
-    let scope = match args.value_of("scope") {
+    let scope = match args.scope {
         Some(s) => s.to_string() + "/",
         None => String::from(""),
     };

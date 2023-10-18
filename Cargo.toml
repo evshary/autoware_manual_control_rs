@@ -14,6 +14,6 @@ serde_derive = "1.0.147"
 cdr = "0.2.4"
 atomic_float = "0.1.0"
 num = "0.4.0"
-clap = "3.2.12"
+clap = { version = "3.2.12", features = ["derive"] }
 zenoh-ros-type = "0.3.2"
 #zenoh-ros-type = { git = "https://github.com/evshary/zenoh-ros-type", branch = "main" }
