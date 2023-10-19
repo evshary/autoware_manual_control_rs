@@ -1,6 +1,7 @@
 mod manual_control;
 
 use clap::{Parser, ValueEnum};
+use core::fmt;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use std::f32::consts;
 use std::sync::Arc;
@@ -61,8 +62,18 @@ enum Mode {
     ROS2,
 }
 
+impl fmt::Display for Mode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Mode::DDS => write!(f, "dds"),
+            Mode::ROS2 => write!(f, "ros2"),
+        }
+    }
+}
+
 fn parse_args() -> (Config, Mode, String) {
     let args = Arguments::parse();
+    log::info!("Argument: {:?}", args);
     let mut config = match args.config {
         Some(conf_file) => Config::from_file(conf_file).unwrap(),
         None => Config::default(),
@@ -81,6 +92,11 @@ fn parse_args() -> (Config, Mode, String) {
         Some(s) => s.to_string() + "/",
         None => String::from(""),
     };
+    log::info!(
+        "autoware_manual_control_rs run in {} mode with prefix {}",
+        mode,
+        prefix
+    );
     (config, mode, prefix)
 }
 
