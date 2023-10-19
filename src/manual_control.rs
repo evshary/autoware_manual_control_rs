@@ -175,7 +175,9 @@ impl<'a> ManualController<'a> {
                 //println!("v:{} angle:{}\r", target_velocity.load(Ordering::Relaxed),
                 //                            steering_tire_angle.load(Ordering::Relaxed));
                 let real_target_velocity = target_velocity.load(Ordering::Relaxed)
-                    * (if gear_cmd.load(Ordering::Relaxed) == 2 {
+                    * (if gear_cmd.load(Ordering::Relaxed)
+                        == autoware_auto_vehicle_msgs::gear_command::DRIVE
+                    {
                         1.0
                     } else {
                         -1.0
@@ -227,14 +229,14 @@ impl<'a> ManualController<'a> {
 
     pub fn toggle_gate_mode(&self) -> bool {
         // Return whether switch to external or not
-        if self.gate_mode.load(Ordering::Relaxed) == 0 {
-            // Auto
-            self.pub_gate_mode(1);
+        if self.gate_mode.load(Ordering::Relaxed) == tier4_control_msgs::gate_mode_data::AUTO {
+            // Auto => External
+            self.pub_gate_mode(tier4_control_msgs::gate_mode_data::EXTERNAL);
             self.send_client_engage();
             true
         } else {
-            // External
-            self.pub_gate_mode(0);
+            // External => Auto
+            self.pub_gate_mode(tier4_control_msgs::gate_mode_data::AUTO);
             false
         }
     }
@@ -262,17 +264,16 @@ impl<'a> ManualController<'a> {
         };
         s += "\tGate Mode:";
         s += match self.gate_mode.load(Ordering::Relaxed) {
-            0 => "Auto",
-            1 => "External",
+            tier4_control_msgs::gate_mode_data::AUTO => "Auto",
+            tier4_control_msgs::gate_mode_data::EXTERNAL => "External",
             _ => "Unknown",
         };
         s += "\tGear:";
-        // TODO: Use const for gear command
         s += match self.gear_command.load(Ordering::Relaxed) {
-            2 => "D",
-            20 => "R",
-            22 => "P",
-            23 => "L",
+            autoware_auto_vehicle_msgs::gear_command::DRIVE => "D",
+            autoware_auto_vehicle_msgs::gear_command::REVERSE => "R",
+            autoware_auto_vehicle_msgs::gear_command::PARK => "P",
+            autoware_auto_vehicle_msgs::gear_command::LOW => "L",
             _ => "?",
         };
         s
