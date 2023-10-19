@@ -2,26 +2,17 @@
   plugins: {
     ros2dds: {
       allow: {
-        publishers: ["/external/selected/control_cmd",
-                    "/external/selected/gear_cmd",
-                    "/control/gate_mode_cmd",
-                    "/control/current_gate_mode",
-                    "/api/autoware/set/engage",
-                    "/api/autoware/get/engage",
-                    "/vehicle/status/velocity_status",
-                    "/vehicle/status/gear_status"],
+        publishers: ["/control/current_gate_mode",
+                      "/api/autoware/get/engage",
+                      "/vehicle/status/velocity_status",
+                      "/vehicle/status/gear_status"],
         subscribers: ["/external/selected/control_cmd",
                      "/external/selected/gear_cmd",
-                     "/control/gate_mode_cmd",
-                     "/control/current_gate_mode",
-                     "/api/autoware/set/engage",
-                     "/api/autoware/get/engage",
-                     "/vehicle/status/velocity_status",
-                     "/vehicle/status/gear_status"],
-        service_servers: ["/abc"],
-        service_clients: ["/abc"],
-        action_servers: ["/abc"],
-        action_clients: ["/abc"],
+                     "/control/gate_mode_cmd"],
+        service_servers: ["/api/autoware/set/engage"],
+        service_clients: ["/all_ignore"],
+        action_servers: ["/all_ignore"],
+        action_clients: ["/all_ignore"],
       }
     }
   }
