@@ -13,8 +13,10 @@ use zenoh_ros_type::{
 };
 
 pub struct ManualController<'a> {
-    // scope
-    scope: String,
+    // mode
+    ros2: bool,
+    // prefix
+    prefix: String,
     // publisher
     publisher_gate_mode: Publisher<'a>,
     client_engage_req: Publisher<'a>,
@@ -35,23 +37,25 @@ pub struct ManualController<'a> {
 }
 
 impl<'a> ManualController<'a> {
-    pub fn new(z_session: Arc<Session>, scope: String) -> Self {
-        let publisher_gate_mode = z_session
-            .declare_publisher(scope.clone() + "rt/control/gate_mode_cmd")
-            .res()
-            .unwrap();
+    pub fn new(z_session: Arc<Session>, ros2: bool, prefix: String) -> Self {
+        let prefix_rt = prefix.clone() + if ros2 { "" } else { "rt/" };
+        let prefix_rq = prefix.clone() + if ros2 { "" } else { "rq/" };
+        let key_gate_mode = prefix_rt.clone() + "control/gate_mode_cmd";
+        let key_client_engage = prefix_rq.clone() + "api/autoware/set/engageRequest";
+        let key_gear_command = prefix_rt.clone() + "external/selected/gear_cmd";
+
+        let publisher_gate_mode = z_session.declare_publisher(key_gate_mode).res().unwrap();
         let client_engage_req = z_session
-            .declare_publisher(scope.clone() + "rq/api/autoware/set/engageRequest")
+            .declare_publisher(key_client_engage)
             .res()
             .unwrap();
-        let publisher_gear_command = z_session
-            .declare_publisher(scope.clone() + "rt/external/selected/gear_cmd")
-            .res()
-            .unwrap();
+        let publisher_gear_command = z_session.declare_publisher(key_gear_command).res().unwrap();
 
         ManualController {
-            // scope
-            scope,
+            // mode
+            ros2,
+            // prefix
+            prefix,
             // publisher
             publisher_gate_mode,
             client_engage_req,
@@ -73,10 +77,17 @@ impl<'a> ManualController<'a> {
     }
 
     pub fn init(&mut self, z_session: Arc<Session>) {
+        let prefix_rt = self.prefix.clone() + if self.ros2 { "" } else { "rt/" };
+        let key_gate_mode = prefix_rt.clone() + "control/current_gate_mode";
+        let key_engage = prefix_rt.clone() + "api/autoware/get/engage";
+        let key_gear_command = prefix_rt.clone() + "vehicle/status/gear_status";
+        let key_velocity = prefix_rt.clone() + "vehicle/status/velocity_status";
+        let key_control_command = prefix_rt.clone() + "external/selected/control_cmd";
+
         let gate_mode = self.gate_mode.clone();
         self._subscriber_gate_mode = Some(
             z_session
-                .declare_subscriber(self.scope.clone() + "rt/control/current_gate_mode")
+                .declare_subscriber(key_gate_mode)
                 .callback_mut(move |sample| {
                     match cdr::deserialize_from::<_, tier4_control_msgs::GateMode, _>(
                         &*sample.payload.contiguous(),
@@ -95,7 +106,7 @@ impl<'a> ManualController<'a> {
         let current_engage = self.current_engage.clone();
         self._subscriber_engage = Some(
             z_session
-                .declare_subscriber(self.scope.clone() + "rt/api/autoware/get/engage")
+                .declare_subscriber(key_engage)
                 .callback_mut(move |sample| {
                     match cdr::deserialize_from::<_, autoware_auto_vehicle_msgs::Engage, _>(
                         &*sample.payload.contiguous(),
@@ -114,7 +125,7 @@ impl<'a> ManualController<'a> {
         let gear_cmd = self.gear_command.clone();
         self._subscriber_gear_command = Some(
             z_session
-                .declare_subscriber(self.scope.clone() + "rt/vehicle/status/gear_status")
+                .declare_subscriber(key_gear_command)
                 .callback_mut(move |sample| {
                     match cdr::deserialize_from::<_, autoware_auto_vehicle_msgs::GearCommand, _>(
                         &*sample.payload.contiguous(),
@@ -133,7 +144,7 @@ impl<'a> ManualController<'a> {
         let current_velocity = self.current_velocity.clone();
         self._subscriber_velocity = Some(
             z_session
-                .declare_subscriber(self.scope.clone() + "rt/vehicle/status/velocity_status")
+                .declare_subscriber(key_velocity)
                 .callback_mut(move |sample| {
                     match cdr::deserialize_from::<_, autoware_auto_vehicle_msgs::VelocityReport, _>(
                         &*sample.payload.contiguous(),
@@ -156,7 +167,7 @@ impl<'a> ManualController<'a> {
         let gear_cmd = self.gear_command.clone();
         let current_velocity = self.current_velocity.clone();
         let publisher_control_command = z_session
-            .declare_publisher(self.scope.clone() + "rt/external/selected/control_cmd")
+            .declare_publisher(key_control_command)
             .res()
             .unwrap();
         thread::spawn(move || {

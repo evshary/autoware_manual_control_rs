@@ -1,6 +1,6 @@
 mod manual_control;
 
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use std::f32::consts;
 use std::sync::Arc;
@@ -33,7 +33,7 @@ fn print_help() {
     println!("------------------------------------");
 }
 
-#[derive(Parser, Default, Debug)]
+#[derive(Parser, Debug)]
 #[clap(version, about)]
 /// Autoware keyboard controller with Zenoh
 struct Arguments {
@@ -45,12 +45,23 @@ struct Arguments {
     /// Repeat this option to open several listeners.
     listen: Option<Vec<String>>,
     #[clap(short, long)]
-    /// A string added as prefix to all routed DDS topics when mapped to a zenoh resource.
-    /// This should be used to avoid conflicts when several distinct DDS systems using the same topics names are routed via zenoh.
-    scope: Option<String>,
+    /// A string added as prefix to all routed DDS/ROS 2 topics when mapped to a zenoh resource.
+    /// This should be used to avoid conflicts when several distinct DDS/ROS 2 systems using the same topics names are routed via zenoh.
+    prefix: Option<String>,
+    #[clap(short, long, value_enum)]
+    /// Select which kind of bridge you're using: zenoh-bridge-dds or zenoh-bridge-ros2dds.
+    mode: Option<Mode>,
 }
 
-fn parse_args() -> (Config, String) {
+#[derive(Debug, Clone, PartialEq, ValueEnum)]
+enum Mode {
+    /// Using zenoh-bridge-dds
+    DDS,
+    /// Using zenoh-bridge-ros2dds
+    ROS2,
+}
+
+fn parse_args() -> (Config, Mode, String) {
     let args = Arguments::parse();
     let mut config = match args.config {
         Some(conf_file) => Config::from_file(conf_file).unwrap(),
@@ -62,20 +73,25 @@ fn parse_args() -> (Config, String) {
             .endpoints
             .extend(endpoints.iter().map(|p| p.parse().unwrap()))
     }
-    let scope = match args.scope {
+    let mode = match args.mode {
+        Some(m) => m,
+        None => Mode::DDS,
+    };
+    let prefix = match args.prefix {
         Some(s) => s.to_string() + "/",
         None => String::from(""),
     };
-    (config, scope)
+    (config, mode, prefix)
 }
 
 fn main() {
     let mut velocity = 0.0; // m/s
     let mut angle = 0.0; // radian
 
-    let (config, scope) = parse_args();
+    let (config, mode, prefix) = parse_args();
     let z_session = Arc::new(zenoh::open(config).res().unwrap());
-    let mut manual_controller = ManualController::new(z_session.clone(), scope);
+    let mut manual_controller =
+        ManualController::new(z_session.clone(), mode == Mode::ROS2, prefix);
     manual_controller.init(z_session.clone());
     print_help();
     crossterm::terminal::enable_raw_mode().unwrap();
