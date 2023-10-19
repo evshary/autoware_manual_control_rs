@@ -94,7 +94,7 @@ impl<'a> ManualController<'a> {
                         cdr::size::Infinite,
                     ) {
                         Ok(gatemode) => {
-                            //println!("gatemode.date={}\r", gatemode.data);
+                            log::debug!("Subscribe gatemode.data={}\r", gatemode.data);
                             gate_mode.store(gatemode.data, Ordering::Relaxed);
                         }
                         Err(_) => {}
@@ -113,7 +113,7 @@ impl<'a> ManualController<'a> {
                         cdr::size::Infinite,
                     ) {
                         Ok(engage) => {
-                            //println!("Engage: {}\r", engage.enable);
+                            log::debug!("Subscribe Engage: {}\r", engage.enable);
                             current_engage.store(engage.enable, Ordering::Relaxed);
                         }
                         Err(_) => {}
@@ -132,7 +132,7 @@ impl<'a> ManualController<'a> {
                         cdr::size::Infinite,
                     ) {
                         Ok(gearcmd) => {
-                            //println!("GearCommand: {}\r", gearcmd.command);
+                            log::debug!("Subscribe GearCommand: {}\r", gearcmd.command);
                             gear_cmd.store(gearcmd.command, Ordering::Relaxed);
                         }
                         Err(_) => {}
@@ -151,7 +151,10 @@ impl<'a> ManualController<'a> {
                         cdr::size::Infinite,
                     ) {
                         Ok(velocity) => {
-                            //println!("Velocity: {}\r", velocity.longitudinal_velocity);
+                            log::debug!(
+                                "Subscribe VelocityReport: {}\r",
+                                velocity.longitudinal_velocity
+                            );
                             current_velocity
                                 .store(velocity.longitudinal_velocity, Ordering::Relaxed);
                         }

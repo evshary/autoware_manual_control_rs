@@ -85,6 +85,8 @@ fn parse_args() -> (Config, Mode, String) {
 }
 
 fn main() {
+    pretty_env_logger::init();
+
     let mut velocity = 0.0; // m/s
     let mut angle = 0.0; // radian
 
