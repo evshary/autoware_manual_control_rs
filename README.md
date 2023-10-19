@@ -2,7 +2,14 @@
 
 Control the vehicle in Autoware with native Zenoh API.
 
-Note that the program should run with zenoh-bridge-dds.
+Note that the program should run with zenoh-bridge-dds / zenoh-bridge-ros2dds.
+
+# Quick Demo
+
+If you want to try the autoware_manual_control_rs within containers, try the following links
+
+* [autoware_teleop_with_bridge_dds](https://github.com/evshary/zenoh_demo_docker_env/tree/main/autoware_teleop_with_bridge_dds)
+* [autoware_teleop_with_bridge_ros2dds](https://github.com/evshary/zenoh_demo_docker_env/tree/main/autoware_teleop_with_bridge_ros2dds)
 
 # Build
 
