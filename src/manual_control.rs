@@ -1,6 +1,6 @@
 use atomic_float::AtomicF32;
 use cdr::{CdrLe, Infinite};
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, SystemTime};
@@ -19,6 +19,10 @@ pub struct ManualController<'a> {
     prefix: String,
     // Session
     z_session: Arc<Session>,
+    // GUID
+    guid: i64,
+    // service sequence
+    sequence_number: Arc<AtomicU64>,
     // service
     key_client_engage: String,
     // publisher
@@ -42,12 +46,11 @@ pub struct ManualController<'a> {
 impl<'a> ManualController<'a> {
     pub fn new(z_session: Arc<Session>, ros2: bool, prefix: String) -> Self {
         let prefix_rt = prefix.clone() + if ros2 { "" } else { "rt/" };
-        let key_client_engage = prefix.clone()
-            + if ros2 {
-                "api/autoware/set/engage"
-            } else {
-                "rq/api/autoware/set/engageRequest"
-            };
+        let key_client_engage = if ros2 {
+            prefix.clone() + "api/autoware/set/engage"
+        } else {
+            "api/autoware/set/engage".to_owned()
+        };
         let key_gate_mode = prefix_rt.clone() + "control/gate_mode_cmd";
         let key_gear_command = prefix_rt.clone() + "external/selected/gear_cmd";
 
@@ -61,6 +64,10 @@ impl<'a> ManualController<'a> {
             prefix,
             // Session
             z_session,
+            // GUID
+            guid: rand::random::<i64>(),
+            // service sequence
+            sequence_number: Arc::new(AtomicU64::default()),
             // service
             key_client_engage,
             // publisher
@@ -254,16 +261,23 @@ impl<'a> ManualController<'a> {
                 }
             }
         } else {
-            // TODO: We assign GUID and seq to 0, but this should be filled with meaningful value.
+            let seq = self.sequence_number.fetch_add(1, Ordering::Relaxed);
             let engage_data = autoware_auto_vehicle_msgs::EngageRequest {
-                header: service::ServiceHeader { guid: 0, seq: 0 },
+                header: service::ServiceHeader {
+                    guid: self.guid,
+                    seq,
+                },
                 mode: true,
             };
+            let request_key = self.prefix.clone() + "rq/" + &self.key_client_engage + "Request";
+            let reply_key = self.prefix.clone() + "rr/" + &self.key_client_engage + "Reply";
+            let subscriber = self.z_session.declare_subscriber(&reply_key).res().unwrap();
             let encoded = cdr::serialize::<_, _, CdrLe>(&engage_data, Infinite).unwrap();
-            self.z_session
-                .put(&self.key_client_engage, encoded)
-                .res()
-                .unwrap();
+            self.z_session.put(&request_key, encoded).res().unwrap();
+            match subscriber.recv() {
+                Ok(sample) => log::info!("Engage Received ('{:?}')\r", sample),
+                Err(err) => log::error!("Engage Received (ERROR: '{:?}')\r", err),
+            }
         }
     }
 

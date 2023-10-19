@@ -276,6 +276,7 @@ dependencies = [
  "log",
  "num",
  "pretty_env_logger",
+ "rand",
  "serde",
  "serde_derive",
  "zenoh",
