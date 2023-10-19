@@ -17,9 +17,12 @@ pub struct ManualController<'a> {
     ros2: bool,
     // prefix
     prefix: String,
+    // Session
+    z_session: Arc<Session>,
+    // service
+    key_client_engage: String,
     // publisher
     publisher_gate_mode: Publisher<'a>,
-    client_engage_req: Publisher<'a>,
     publisher_gear_command: Publisher<'a>,
     // subscriber
     _subscriber_gate_mode: Option<Subscriber<'a, ()>>,
@@ -39,16 +42,16 @@ pub struct ManualController<'a> {
 impl<'a> ManualController<'a> {
     pub fn new(z_session: Arc<Session>, ros2: bool, prefix: String) -> Self {
         let prefix_rt = prefix.clone() + if ros2 { "" } else { "rt/" };
-        let prefix_rq = prefix.clone() + if ros2 { "" } else { "rq/" };
+        let key_client_engage = prefix.clone()
+            + if ros2 {
+                "api/autoware/set/engage"
+            } else {
+                "rq/api/autoware/set/engageRequest"
+            };
         let key_gate_mode = prefix_rt.clone() + "control/gate_mode_cmd";
-        let key_client_engage = prefix_rq.clone() + "api/autoware/set/engageRequest";
         let key_gear_command = prefix_rt.clone() + "external/selected/gear_cmd";
 
         let publisher_gate_mode = z_session.declare_publisher(key_gate_mode).res().unwrap();
-        let client_engage_req = z_session
-            .declare_publisher(key_client_engage)
-            .res()
-            .unwrap();
         let publisher_gear_command = z_session.declare_publisher(key_gear_command).res().unwrap();
 
         ManualController {
@@ -56,9 +59,12 @@ impl<'a> ManualController<'a> {
             ros2,
             // prefix
             prefix,
+            // Session
+            z_session,
+            // service
+            key_client_engage,
             // publisher
             publisher_gate_mode,
-            client_engage_req,
             publisher_gear_command,
             // subscriber
             _subscriber_gate_mode: None,
@@ -221,13 +227,36 @@ impl<'a> ManualController<'a> {
     }
 
     fn send_client_engage(&self) {
-        // TODO: We assign GUID and seq to 0, but this should be filled with meaningful value.
-        let engage_data = autoware_auto_vehicle_msgs::EngageRequest {
-            header: service::ServiceHeader { guid: 0, seq: 0 },
-            mode: true,
-        };
-        let encoded = cdr::serialize::<_, _, CdrLe>(&engage_data, Infinite).unwrap();
-        self.client_engage_req.put(encoded).res().unwrap();
+        if self.ros2 {
+            let engage_data = true;
+            let encoded = cdr::serialize::<_, _, CdrLe>(&engage_data, Infinite).unwrap();
+            let replies = self
+                .z_session
+                .get(&self.key_client_engage)
+                .with_value(encoded)
+                .res()
+                .unwrap();
+            match replies.recv() {
+                Ok(reply) => match reply.sample {
+                    Ok(sample) => log::info!("Engage Received ('{:?}')\r", sample),
+                    Err(err) => log::error!("Engage Received (ERROR: '{:?}')\r", err),
+                },
+                Err(err) => {
+                    log::error!("Failed to send engage query {:?}!\r", err);
+                }
+            }
+        } else {
+            // TODO: We assign GUID and seq to 0, but this should be filled with meaningful value.
+            let engage_data = autoware_auto_vehicle_msgs::EngageRequest {
+                header: service::ServiceHeader { guid: 0, seq: 0 },
+                mode: true,
+            };
+            let encoded = cdr::serialize::<_, _, CdrLe>(&engage_data, Infinite).unwrap();
+            self.z_session
+                .put(&self.key_client_engage, encoded)
+                .res()
+                .unwrap();
+        }
     }
 
     pub fn toggle_gate_mode(&self) -> bool {
