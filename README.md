@@ -15,34 +15,26 @@ cd autoware_manual_control_rs
 cargo build --release
 ```
 
-* Build zenoh-bridge-dds
+* Option 1: Use zenoh-bridge-dds
 
 ```shell
+# Build zenoh-bridge-dds
 git clone https://github.com/eclipse-zenoh/zenoh-plugin-dds.git
 cd zenoh-plugin-dds
 # Note that the zenoh version of autoware_manual_control_rs and zenoh-bridge-dds should match
-git checkout 0.7.2-rc
 cargo build --release -p zenoh-bridge-dds
+cd ..
 ```
 
-* Create `myconfig.json` under zenoh-bridge-dds
-  - We want to set the topic filter
+* Option 2: Use zenoh-bridge-ros2dds
 
-```json5
-{                                                                                  
-  plugins: {                                                                       
-    dds: {                                                                         
-      allow: ["/external/selected/control_cmd",
-              "/external/selected/gear_cmd",
-              "/control/gate_mode_cmd",
-              "/control/current_gate_mode",
-              "/api/autoware/set/engage",
-              "/api/autoware/get/engage",
-              "/vehicle/status/velocity_status",
-              "/vehicle/status/gear_status"]
-    }                                                                              
-  }                                                                                
-}
+```shell
+# Build zenoh-bridge-ros2dds
+git clone https://github.com/eclipse-zenoh/zenoh-plugin-ros2dds.git
+cd zenoh-plugin-ros2dds
+# Note that the zenoh version of autoware_manual_control_rs and zenoh-bridge-ros2dds should match
+cargo build --release -p zenoh-bridge-ros2dds
+cd ..
 ```
 
 # Run
@@ -50,7 +42,12 @@ cargo build --release -p zenoh-bridge-dds
 * 1st terminal: Run Autoware1
 
 ```shell
-rocker --network host --privileged --x11 --user --volume $HOME/autoware_map -- ghcr.io/autowarefoundation/autoware-universe:latest-prebuilt bash
+# Get the map
+mkdir ~/autoware_map
+gdown -O ~/autoware_map/ 'https://docs.google.com/uc?export=download&id=1499_nsbUbIeturZaDj7jhUownh5fvXHd'
+unzip -d ~/autoware_map ~/autoware_map/sample-map-planning.zip
+# Run Autoware docker
+rocker --network host --privileged --x11 --user --volume $HOME/autoware_map -- ghcr.io/autowarefoundation/autoware-universe:galactic-20221115-prebuilt-amd64 bash
 # Inside the docker
 ROS_DOMAIN_ID=1 ros2 launch autoware_launch planning_simulator.launch.xml map_path:=$HOME/autoware_map/sample-map-planning vehicle_model:=sample_vehicle sensor_model:=sample_sensor_kit
 ```
@@ -58,30 +55,32 @@ ROS_DOMAIN_ID=1 ros2 launch autoware_launch planning_simulator.launch.xml map_pa
 * 2nd terminal: Run Autoware2
 
 ```shell
-rocker --network host --privileged --x11 --user --volume $HOME/autoware_map -- ghcr.io/autowarefoundation/autoware-universe:latest-prebuilt bash
+# Run Autoware docker
+rocker --network host --privileged --x11 --user --volume $HOME/autoware_map -- ghcr.io/autowarefoundation/autoware-universe:galactic-20221115-prebuilt-amd64 bash
 # Inside the docker
 ROS_DOMAIN_ID=2 ros2 launch autoware_launch planning_simulator.launch.xml map_path:=$HOME/autoware_map/sample-map-planning vehicle_model:=sample_vehicle sensor_model:=sample_sensor_kit
 ```
 
-* 3rd terminal: Run zenoh-bridge-dds for Autoware1
+* Option1: Use zenoh-bridge-dds
 
 ```shell
-cd ~/zenoh-bridge-dds
-./target/release/zenoh-bridge-dds -c myconfig.json5 -s "v1" -d 1
+# terminal 3
+./zenoh-plugin-dds/target/release/zenoh-bridge-dds -c zenoh-bridge-dds.json5 -s "v1" -d 1
+# terminal 4
+./zenoh-plugin-dds/target/release/zenoh-bridge-dds -c zenoh-bridge-dds.json5 -s "v2" -d 2
+# terminal 5
+./target/release/autoware_manual_control -p "*" -m dds
 ```
 
-* 4th terminal: Run zenoh-bridge-dds for Autoware2
+* Option2: Use zenoh-bridge-ros2dds
 
 ```shell
-cd ~/zenoh-bridge-dds
-./target/release/zenoh-bridge-dds -c myconfig.json5 -s "v2" -d 2
-```
-
-* 5th terminal: Run manual_control for two vehicles
-
-```shell
-cd ~/autoware_manual_control_rs
-./target/release/autoware_manual_control -s "*"
+# terminal 3
+./zenoh-plugin-ros2dds/target/release/zenoh-bridge-ros2dds -c zenoh-bridge-ros2dds.json5 -n "/v1" -d 1
+# terminal 4
+./zenoh-plugin-ros2dds/target/release/zenoh-bridge-ros2dds -c zenoh-bridge-ros2dds.json5 -n "/v2" -d 2
+# terminal 5
+./target/release/autoware_manual_control -p "*" -m ros2
 ```
 
 # Usage
