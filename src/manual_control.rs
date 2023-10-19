@@ -3,7 +3,7 @@ use cdr::{CdrLe, Infinite};
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Arc;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 use zenoh::prelude::sync::*;
 use zenoh::publication::Publisher;
 use zenoh::subscriber::Subscriber;
@@ -181,8 +181,11 @@ impl<'a> ManualController<'a> {
             .unwrap();
         thread::spawn(move || {
             loop {
-                //println!("v:{} angle:{}\r", target_velocity.load(Ordering::Relaxed),
-                //                            steering_tire_angle.load(Ordering::Relaxed));
+                log::debug!(
+                    "target velocity:{}, target angle:{}\r",
+                    target_velocity.load(Ordering::Relaxed),
+                    steering_tire_angle.load(Ordering::Relaxed)
+                );
                 let real_target_velocity = target_velocity.load(Ordering::Relaxed)
                     * (if gear_cmd.load(Ordering::Relaxed)
                         == autoware_auto_vehicle_msgs::gear_command::DRIVE
@@ -197,17 +200,22 @@ impl<'a> ManualController<'a> {
                     -1.0,
                     1.0,
                 );
-                // TODO: This should be filled with current time
-                let empty_time = builtin_interfaces::Time { sec: 0, nanosec: 0 };
+                let current_time = SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap();
+                let ros_time = builtin_interfaces::Time {
+                    sec: current_time.as_secs() as i32,
+                    nanosec: current_time.subsec_nanos(),
+                };
                 let control_cmd = autoware_auto_control_msgs::AckermannControlCommand {
-                    stamp: empty_time.clone(),
+                    stamp: ros_time.clone(),
                     lateral: autoware_auto_control_msgs::AckermannLateralCommand {
-                        stamp: empty_time.clone(),
+                        stamp: ros_time.clone(),
                         steering_tire_angle: steering_tire_angle.load(Ordering::Relaxed),
                         steering_tire_rotation_rate: 0.0,
                     },
                     longitudinal: autoware_auto_control_msgs::LongitudinalCommand {
-                        stamp: empty_time.clone(),
+                        stamp: ros_time.clone(),
                         speed: real_target_velocity,
                         acceleration,
                         jerk: 0.0,
