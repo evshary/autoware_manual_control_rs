@@ -9,7 +9,7 @@ use zenoh::publication::Publisher;
 use zenoh::subscriber::Subscriber;
 use zenoh_ros_type::{
     autoware_auto_control_msgs, autoware_auto_vehicle_msgs, builtin_interfaces, service,
-    tier4_control_msgs,
+    tier4_control_msgs, tier4_external_api_msgs,
 };
 
 pub struct ManualController<'a> {
@@ -253,7 +253,23 @@ impl<'a> ManualController<'a> {
                 .unwrap();
             match replies.recv() {
                 Ok(reply) => match reply.sample {
-                    Ok(sample) => log::info!("Engage Received ('{:?}')\r", sample),
+                    Ok(sample) => {
+                        match cdr::deserialize_from::<_, tier4_external_api_msgs::EngageResponse, _>(
+                            &*sample.payload.contiguous(),
+                            cdr::size::Infinite,
+                        ) {
+                            Ok(engage) => {
+                                log::info!(
+                                    "Engage Received ('code: {}, message: {}')\r",
+                                    engage.status.code,
+                                    engage.status.message
+                                );
+                            }
+                            Err(err) => {
+                                log::error!("Unable to deserialize engage message: {:?}\r", err)
+                            }
+                        }
+                    }
                     Err(err) => log::error!("Engage Received (ERROR: '{:?}')\r", err),
                 },
                 Err(err) => {
@@ -262,7 +278,8 @@ impl<'a> ManualController<'a> {
             }
         } else {
             let seq = self.sequence_number.fetch_add(1, Ordering::Relaxed);
-            let engage_data = autoware_auto_vehicle_msgs::EngageRequest {
+            log::info!("Sending Engage: guid={}, seq={}\r", self.guid as u64, seq);
+            let engage_data = tier4_external_api_msgs::RawEngageRequest {
                 header: service::ServiceHeader {
                     guid: self.guid,
                     seq,
@@ -275,7 +292,25 @@ impl<'a> ManualController<'a> {
             let encoded = cdr::serialize::<_, _, CdrLe>(&engage_data, Infinite).unwrap();
             self.z_session.put(&request_key, encoded).res().unwrap();
             match subscriber.recv() {
-                Ok(sample) => log::info!("Engage Received ('{:?}')\r", sample),
+                Ok(sample) => {
+                    match cdr::deserialize_from::<_, tier4_external_api_msgs::RawEngageResponse, _>(
+                        &*sample.payload.contiguous(),
+                        cdr::size::Infinite,
+                    ) {
+                        Ok(engage) => {
+                            log::info!(
+                                "Engage Received ('guid: {}, seq: {}, code: {}, message: {}')\r",
+                                engage.header.guid as u64,
+                                engage.header.seq,
+                                engage.status.code,
+                                engage.status.message
+                            );
+                        }
+                        Err(err) => {
+                            log::error!("Unable to deserialize engage message: {:?}\r", err)
+                        }
+                    }
+                }
                 Err(err) => log::error!("Engage Received (ERROR: '{:?}')\r", err),
             }
         }
